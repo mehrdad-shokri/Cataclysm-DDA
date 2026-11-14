@@ -2,118 +2,100 @@
 #ifndef CATA_SRC_DEBUG_MENU_H
 #define CATA_SRC_DEBUG_MENU_H
 
-#include <functional>
-#include <iosfwd>
+#include <cstddef>
+#include <optional>
+#include <string>
+#include <string_view>
 
-#include "enum_traits.h"
+#include "coordinates.h"  // IWYU pragma: keep
+#include "debug_menu_types.h"  // IWYU pragma: export
 
-struct tripoint;
-template <typename E> struct enum_traits;
-
-namespace cata
-{
-template<typename T>
-class optional;
-} // namespace cata
-
-class player;
+class Character;
+class Creature;
+struct mongroup;
 
 namespace debug_menu
 {
 
-enum class debug_menu_index : int {
-    WISH,
-    SHORT_TELEPORT,
-    LONG_TELEPORT,
-    REVEAL_MAP,
-    SPAWN_NPC,
-    SPAWN_MON,
-    GAME_STATE,
-    KILL_NPCS,
-    MUTATE,
-    SPAWN_VEHICLE,
-    CHANGE_SKILLS,
-    LEARN_MA,
-    UNLOCK_RECIPES,
-    EDIT_PLAYER,
-    SPAWN_ARTIFACT,
-    SPAWN_CLAIRVOYANCE,
-    MAP_EDITOR,
-    CHANGE_WEATHER,
-    WIND_DIRECTION,
-    WIND_SPEED,
-    KILL_MONS,
-    DISPLAY_HORDES,
-    TEST_IT_GROUP,
-    DAMAGE_SELF,
-    BLEED_SELF,
-    SHOW_SOUND,
-    DISPLAY_WEATHER,
-    DISPLAY_SCENTS,
-    CHANGE_TIME,
-    SET_AUTOMOVE,
-    SHOW_MUT_CAT,
-    OM_EDITOR,
-    BENCHMARK,
-    OM_TELEPORT,
-    TRAIT_GROUP,
-    ENABLE_ACHIEVEMENTS,
-    SHOW_MSG,
-    CRASH_GAME,
-    MAP_EXTRA,
-    DISPLAY_NPC_PATH,
-    PRINT_FACTION_INFO,
-    PRINT_NPC_MAGIC,
-    QUIT_NOSAVE,
-    TEST_WEATHER,
-    SAVE_SCREENSHOT,
-    GAME_REPORT,
-    DISPLAY_SCENTS_LOCAL,
-    DISPLAY_SCENTS_TYPE_LOCAL,
-    DISPLAY_TEMP,
-    DISPLAY_VEHICLE_AI,
-    DISPLAY_VISIBILITY,
-    DISPLAY_LIGHTING,
-    DISPLAY_RADIATION,
-    LEARN_SPELLS,
-    LEVEL_SPELLS,
-    TEST_MAP_EXTRA_DISTRIBUTION,
-    NESTED_MAPGEN,
-    VEHICLE_BATTERY_CHARGE,
-    last
-};
-
-void teleport_short();
-void teleport_long();
-void teleport_overmap();
-
-void spawn_nested_mapgen();
-void character_edit_menu();
-void wishitem( player *p = nullptr );
-void wishitem( player *p, const tripoint & );
-void wishmonster( const cata::optional<tripoint> &p );
-void wishmutate( player *p );
-void wishskill( player *p );
-void mutation_wish();
-void draw_benchmark( int max_difference );
+void wisheffect( Creature &p );
+void wishitem( Character *you = nullptr );
+void wishitem( Character *you, const tripoint_bub_ms & );
+// Shows a menu to debug item groups. Spawns items if test is false, otherwise displays would be spawned items.
+void wishitemgroup( bool test );
+void wishmonster( const std::optional<tripoint_bub_ms> &p );
+void wishmonstergroup( tripoint_abs_omt &loc );
+void wishmonstergroup_mon_selection( mongroup &group );
+void wishmutate( Character *you );
+void wishbionics( Character *you );
+/*
+ * Set skill on any Character object; player character or NPC
+ * Can change skill theory level
+ */
+void wishskill( Character *you, bool change_theory = false );
+/*
+ * Set proficiency on any Character object; player character or NPC
+ */
+void wishproficiency( Character *you );
 
 void debug();
+void execute_action( debug_menu_index action );
+void open_console();
+
+void export_save_archive_and_game_report();
+
+void do_debug_quick_setup( bool flag_dirty = false );
+
+/* Splits a string by @param delimiter and push_back's the elements into _Container */
+template<typename Container>
+Container string_to_iterable( const std::string_view str, const std::string_view delimiter )
+{
+    Container res;
+
+    size_t pos = 0;
+    size_t start = 0;
+    while( ( pos = str.find( delimiter, start ) ) != std::string::npos ) {
+        if( pos > start ) {
+            res.emplace_back( str.substr( start, pos - start ) );
+        }
+        start = pos + delimiter.length();
+    }
+    if( start != str.length() ) {
+        res.emplace_back( str.substr( start, str.length() - start ) );
+    }
+
+    return res;
+}
+
+bool is_debug_character();
+void prompt_map_reveal( const std::optional<tripoint_abs_omt> &p = std::nullopt );
+void map_reveal( int reveal_level_int, const std::optional<tripoint_abs_omt> &p = std::nullopt );
+
+/* Merges iterable elements into std::string with
+ * @param delimiter between them
+ * @param f is callable that is called to transform each value
+ * */
+template<typename Container, typename Mapper>
+std::string iterable_to_string( const Container &values, const std::string_view delimiter,
+                                const Mapper &f )
+{
+    std::string res;
+    for( auto iter = values.begin(); iter != values.end(); ++iter ) {
+        if( iter != values.begin() ) {
+            res += delimiter;
+        }
+        res += f( *iter );
+    }
+    return res;
+}
+
+template<typename Container>
+std::string iterable_to_string( const Container &values, const std::string_view delimiter )
+{
+    return iterable_to_string( values, delimiter, []( const std::string_view f ) {
+        return f;
+    } );
+}
 
 } // namespace debug_menu
-
-template<>
-struct enum_traits<debug_menu::debug_menu_index> {
-    static constexpr debug_menu::debug_menu_index last = debug_menu::debug_menu_index::last;
-};
-
-namespace std
-{
-template<>
-struct hash<debug_menu::debug_menu_index> {
-    std::size_t operator()( const debug_menu::debug_menu_index v ) const noexcept {
-        return hash<int>()( static_cast<int>( v ) );
-    }
-};
-} // namespace std
 
 #endif // CATA_SRC_DEBUG_MENU_H

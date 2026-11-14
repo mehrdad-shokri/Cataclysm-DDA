@@ -1,20 +1,18 @@
 #include "kill_tracker.h"
 
-#include <algorithm>
-#include <tuple>
+#include <memory>
+#include <set>
+#include <string>
 #include <utility>
 
-#include "avatar.h"
 #include "cata_variant.h"
 #include "character.h"
 #include "character_id.h"
-#include "color.h"
 #include "event.h"
+#include "game.h"
 #include "mtype.h"
-#include "options.h"
-#include "string_formatter.h"
-#include "string_id.h"
-#include "translations.h"
+#include "npc.h"
+#include "weakpoint.h"
 
 void kill_tracker::reset( const std::map<mtype_id, int> &kills_,
                           const std::vector<std::string> &npc_kills_ )
@@ -43,6 +41,28 @@ int kill_tracker::kill_count( const species_id &spec ) const
     return result;
 }
 
+int kill_tracker::guilt_kill_count() const
+{
+    int count = 0;
+    std::vector<mon_flag_id> guilt_flags = {
+        mon_flag_GUILT_ANIMAL,
+        mon_flag_GUILT_CHILD,
+        mon_flag_GUILT_HUMAN,
+        mon_flag_GUILT_OTHERS
+    };
+    for( const auto &it : kills ) {
+        for( mon_flag_id &flag : guilt_flags ) {
+            if( it.first->has_flag( flag ) ) {
+                count += it.second;
+                break;
+            }
+        }
+    }
+    // Human kills always count for deadening purposes, even if the kill itself didn't trigger guilt.
+    count += static_cast<int>( npc_kills.size() );
+    return count;
+}
+
 int kill_tracker::monster_kill_count() const
 {
     int result = 0;
@@ -57,58 +77,9 @@ int kill_tracker::npc_kill_count() const
     return npc_kills.size();
 }
 
-int kill_tracker::kill_xp() const
+int kill_tracker::total_kill_count() const
 {
-    int ret = 0;
-    for( const std::pair<const mtype_id, int> &pair : kills ) {
-        ret += ( pair.first->difficulty + pair.first->difficulty_base ) * pair.second;
-    }
-    ret += npc_kills.size() * 10;
-    return ret;
-}
-
-std::string kill_tracker::get_kills_text() const
-{
-    std::vector<std::string> data;
-    int totalkills = 0;
-
-    std::map<std::tuple<std::string, std::string, nc_color>, int> kill_counts;
-
-    // map <name, sym, color> to kill count
-    for( const std::pair<const mtype_id, int> &elem : kills ) {
-        const mtype &m = elem.first.obj();
-        auto key = std::make_tuple( m.nname(), m.sym, m.color );
-        kill_counts[key] += elem.second;
-        totalkills += elem.second;
-    }
-
-    for( const auto &entry : kill_counts ) {
-        const int num_kills = entry.second;
-        const std::string &mname = std::get<0>( entry.first );
-        const std::string &symbol = std::get<1>( entry.first );
-        const nc_color color = std::get<2>( entry.first );
-        data.push_back( string_format( "%4d ", num_kills ) + colorize( symbol,
-                        color ) + " " + colorize( mname, c_light_gray ) );
-    }
-    for( const auto &npc_name : npc_kills ) {
-        totalkills += 1;
-        data.push_back( string_format( "%4d ", 1 ) + colorize( "@ " + npc_name, c_magenta ) );
-    }
-    std::string buffer;
-    if( data.empty() ) {
-        buffer = _( "You haven't killed any monsters yet!" );
-    } else {
-        buffer = string_format( _( "KILL COUNT: %d" ), totalkills );
-        if( get_option<bool>( "STATS_THROUGH_KILLS" ) ) {
-            buffer += string_format( _( "\nExperience: %d (%d points available)" ), kill_xp(),
-                                     get_avatar().free_upgrade_points() );
-        }
-        buffer += "\n";
-    }
-    for( const std::string &line : data ) {
-        buffer += "\n" + line;
-    }
-    return buffer;
+    return monster_kill_count() + npc_kill_count();
 }
 
 void kill_tracker::clear()
@@ -117,26 +88,44 @@ void kill_tracker::clear()
     npc_kills.clear();
 }
 
+static Character *get_avatar_or_follower( const character_id &id )
+{
+    Character &player = get_player_character();
+    if( player.getID() == id ) {
+        return &player;
+    }
+    if( g->get_follower_list().count( id ) ) {
+        return g->find_npc( id );
+    }
+    return nullptr;
+}
+
+// Legacy value, maintained until kill_xp rework/removal from dependent in-repo mods
+static constexpr int npc_kill_xp = 10;
+
 void kill_tracker::notify( const cata::event &e )
 {
     switch( e.type() ) {
         case event_type::character_kills_monster: {
-            character_id killer = e.get<character_id>( "killer" );
-            if( killer != get_player_character().getID() ) {
-                // TODO: add a kill counter for npcs?
-                break;
+            const character_id killer_id = e.get<character_id>( "killer" );
+            if( Character *killer = get_avatar_or_follower( killer_id ) ) {
+                const mtype_id victim_type = e.get<mtype_id>( "victim_type" );
+                kills[victim_type]++;
+                // Legacy value update, maintained until kill_xp rework/removal from dependent in-repo mods
+                killer->kill_xp += e.get<int>( "exp" );
+                victim_type.obj().families.practice_kill( *killer );
             }
-            mtype_id victim_type = e.get<mtype_id>( "victim_type" );
-            kills[victim_type]++;
             break;
         }
         case event_type::character_kills_character: {
-            character_id killer = e.get<character_id>( "killer" );
-            if( killer != get_player_character().getID() ) {
-                break;
+            const character_id killer_id = e.get<character_id>( "killer" );
+            // player is credited for NPC kills they or their followers make
+            if( Character *killer = get_avatar_or_follower( killer_id ) ) {
+                const std::string victim_name = e.get<cata_variant_type::string>( "victim_name" );
+                npc_kills.push_back( victim_name );
+                // Legacy value update, maintained until kill_xp rework/removal from dependent in-repo mods
+                killer->kill_xp += npc_kill_xp;
             }
-            std::string victim_name = e.get<cata_variant_type::string>( "victim_name" );
-            npc_kills.push_back( victim_name );
             break;
         }
         default:

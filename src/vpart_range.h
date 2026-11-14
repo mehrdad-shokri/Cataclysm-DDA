@@ -2,16 +2,15 @@
 #ifndef CATA_SRC_VPART_RANGE_H
 #define CATA_SRC_VPART_RANGE_H
 
-#include <cassert>
-#include <functional>
 #include <cstddef>
+#include <functional>
 #include <iterator>
+#include <optional>
 #include <utility>
 
-#include "optional.h"
 #include "vpart_position.h"
-#include "vehicle.h"
 
+class vehicle;
 enum class part_status_flag : int;
 
 /**
@@ -26,7 +25,7 @@ class vehicle_part_iterator
 {
     private:
         std::reference_wrapper<const range_type> range_;
-        cata::optional<vpart_reference> vp_;
+        std::optional<vpart_reference> vp_;
 
         const range_type &range() const {
             return range_.get();
@@ -44,24 +43,46 @@ class vehicle_part_iterator
         }
 
     public:
-        vehicle_part_iterator( const range_type &r, size_t i ) : range_( r ) {
-            assert( i <= range().part_count() );
+        vehicle_part_iterator( const range_type &r, size_t i ) : range_( r ), vp_( std::nullopt ) {
+            cata_assert( i <= range().part_count() );
             skip_to_next_valid( i );
         }
-        vehicle_part_iterator( const vehicle_part_iterator & ) = default;
+
+        vehicle_part_iterator( const vehicle_part_iterator &rhs ) : range_( rhs.range_ ),
+            vp_( std::nullopt ) {
+            if( rhs.vp_ ) {
+                vp_.emplace( rhs.vp_->vehicle(), rhs.vp_->part_index() );
+            }
+        }
+
+        vehicle_part_iterator &operator=( const vehicle_part_iterator &rhs ) {
+            if( this != &rhs ) {
+                range_ = rhs.range_;
+                vp_.reset();
+                if( rhs.vp_ ) {
+                    vp_.emplace( rhs.vp_->vehicle(), rhs.vp_->part_index() );
+                }
+            }
+            return *this;
+        }
 
         const vpart_reference &operator*() const {
-            assert( vp_ );
+            cata_assert( vp_ );
             return *vp_;
         }
         const vpart_reference *operator->() const {
-            assert( vp_ );
+            cata_assert( vp_ );
             return &*vp_;
         }
 
         vehicle_part_iterator &operator++() {
-            assert( vp_ );
+            cata_assert( vp_ );
+#pragma GCC diagnostic push
+#ifndef __clang__
+# pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
+#endif
             skip_to_next_valid( vp_->part_index() + 1 );
+#pragma GCC diagnostic pop
             return *this;
         }
 
@@ -72,23 +93,29 @@ class vehicle_part_iterator
             if( !vp_.has_value() ) {
                 return true;
             }
+#pragma GCC diagnostic push
+#ifndef __clang__
+# pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
+#endif
             return &vp_->vehicle() == &rhs.vp_->vehicle() && vp_->part_index() == rhs.vp_->part_index();
+#pragma GCC diagnostic pop
         }
         bool operator!=( const vehicle_part_iterator &rhs ) const {
             return !operator==( rhs );
         }
 };
 
-namespace std
-{
-template<class T> struct iterator_traits<vehicle_part_iterator<T>> {
+template<class T>
+// NOLINTNEXTLINE(cert-dcl58-cpp)
+struct std::iterator_traits<vehicle_part_iterator<T>> {
     using difference_type = size_t;
     using value_type = vpart_reference;
     // TODO: maybe change into random access iterator? This requires adding
     // more operators to the iterator, which may not be efficient.
+    using reference = const vpart_reference &;
+    using pointer = const vpart_reference *;
     using iterator_category = std::forward_iterator_tag;
 };
-} // namespace std
 
 /**
  * The generic range, it misses the `bool contained(size_t)` function that is
@@ -100,15 +127,22 @@ template<typename range_type>
 class generic_vehicle_part_range
 {
     private:
-        std::reference_wrapper<::vehicle> vehicle_;
+        ::vehicle *vehicle_;
+        bool with_fake_;
 
     public:
-        generic_vehicle_part_range( ::vehicle &v ) : vehicle_( v ) { }
+        explicit generic_vehicle_part_range( ::vehicle &v, bool with_fake = false ) : vehicle_( &v ),
+            with_fake_( with_fake ) { }
 
         // Templated because see top of file.
         template<typename T = ::vehicle>
         size_t part_count() const {
-            return static_cast<const T &>( vehicle_.get() ).part_count();
+            if( with_fake_ ) {
+                return static_cast<const T &>( *vehicle_ ).part_count();
+            } else {
+                return static_cast<const T &>( *vehicle_ ).part_count_real_cached();
+            }
+
         }
 
         using iterator = vehicle_part_iterator<range_type>;
@@ -134,7 +168,7 @@ class generic_vehicle_part_range
         }
 
         ::vehicle &vehicle() const {
-            return vehicle_.get();
+            return *vehicle_;
         }
 };
 
@@ -142,11 +176,22 @@ class generic_vehicle_part_range
 class vehicle_part_range : public generic_vehicle_part_range<vehicle_part_range>
 {
     public:
-        vehicle_part_range( ::vehicle &v ) : generic_vehicle_part_range( v ) { }
+        explicit vehicle_part_range( ::vehicle &v ) : generic_vehicle_part_range( v ) { }
 
-        bool matches( const size_t /*part*/ ) const {
-            return true;
-        }
+        bool matches( size_t part ) const;
+};
+
+class vehicle_part_with_fakes_range : public
+    generic_vehicle_part_range<vehicle_part_with_fakes_range>
+{
+    private:
+        bool with_inactive_fakes_;
+    public:
+        vehicle_part_with_fakes_range( ::vehicle &v, bool with_inactive ) :
+            generic_vehicle_part_range( v, true ),
+            with_inactive_fakes_( with_inactive ) { }
+
+        bool matches( size_t part ) const;
 };
 
 /** A range that contains parts that have a given feature and (optionally) are not broken. */

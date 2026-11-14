@@ -17,8 +17,7 @@
  */
 struct fire_data {
     fire_data() = default;
-    fire_data( const fire_data & ) = default;
-    fire_data( int intensity, bool is_contained = false ) : fire_intensity( intensity ),
+    explicit fire_data( int intensity, bool is_contained = false ) : fire_intensity( intensity ),
         contained( is_contained )
     {}
     /** Current intensity of the fire.  This is an input to the calculations */
@@ -54,6 +53,8 @@ struct mat_burn_data {
     float smoke = 0.0f;
     /** Volume of material destroyed per tick when this material burns. */
     float burn = 0.0f;
+
+    void deserialize( const JsonObject &jo );
 };
 
 #endif // CATA_SRC_FIRE_H

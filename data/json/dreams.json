@@ -16,8 +16,42 @@
   },
   {
     "type": "dream",
+    "messages": [ "You have a strange dream about rabbits.", "Your dreams give you a strange furry feeling." ],
+    "category": "RABBIT",
+    "strength": 1
+  },
+  {
+    "type": "dream",
     "messages": [ "You have a strange dream about birds.", "Your dreams give you a strange feathered feeling." ],
     "category": "BIRD",
+    "strength": 1
+  },
+  {
+    "type": "dream",
+    "messages": [
+      "You have a strange dream about snails and slugs in your garden.",
+      "Your dreams leave you feeling like something is stuck to you."
+    ],
+    "category": "GASTROPOD",
+    "strength": 1
+  },
+  {
+    "type": "dream",
+    "messages": [
+      "You dream about the moon.",
+      "You dream you're safely at home with a bustling family.",
+      "You dream of chasing a beautiful butterfly."
+    ],
+    "category": "CHIROPTERAN",
+    "strength": 1
+  },
+  {
+    "type": "dream",
+    "messages": [
+      "You have a strange dream about frogs in a pond near your childhood home.",
+      "Your dreams contain a croaking concerto."
+    ],
+    "category": "BATRACHIAN",
     "strength": 1
   },
   {
@@ -106,7 +140,12 @@
   },
   {
     "type": "dream",
-    "messages": [ "You have a strange dream.", "You feel a yearning..." ],
+    "messages": [
+      "You have a strange dream.",
+      "You have a puckish dream.",
+      "You dream of the changeling.  Again.",
+      "You feel a yearning…"
+    ],
     "category": "ELFA",
     "strength": 1
   },
@@ -141,6 +180,22 @@
   },
   {
     "type": "dream",
+    "messages": [ "You dream you are sleeping.  How odd?", "You sleep so well.  You must have been tired." ],
+    "category": "INTERSTICE",
+    "strength": 1
+  },
+  {
+    "type": "dream",
+    "messages": [
+      "You have a strange dream about crabs.",
+      "Your dreams give you a strange shelled feeling.",
+      "You dream of grabbing something in an oversized claw."
+    ],
+    "category": "CRUSTACEAN",
+    "strength": 1
+  },
+  {
+    "type": "dream",
     "messages": [
       "You have a disturbing dream of bathing in the sun on a rock.",
       "While dreaming, you see a distinctively lizard-like reflection of yourself."
@@ -152,9 +207,49 @@
     "type": "dream",
     "messages": [
       "You have a disturbing dream of undergoing strange medical procedures.",
-      "While dreaming, you see yourself dressed in a hospital gown, receiving treatment."
+      "While dreaming, you see yourself dressed in a hospital gown, receiving treatment.",
+      "You dream of a hospital where doctors try out experimental treatments."
     ],
     "category": "MEDICAL",
+    "strength": 2
+  },
+  {
+    "type": "dream",
+    "messages": [
+      "You have a disturbing dream about running from dogs.",
+      "While dreaming, you see a distinctively rabbit-like reflection of yourself.",
+      "You dream of digging a hole under a hill to make your home."
+    ],
+    "category": "RABBIT",
+    "strength": 2
+  },
+  {
+    "type": "dream",
+    "messages": [
+      "You dream of flying.",
+      "You have an upsetting dream about falling and being unable to get back up.",
+      "Tinnitus follows you into your dreams, where it becomes a chorus of crickets.",
+      "You dream of warm breath and fresh blood."
+    ],
+    "category": "CHIROPTERAN",
+    "strength": 2
+  },
+  {
+    "type": "dream",
+    "messages": [
+      "You have a strange dream of carrying a house on your back.",
+      "While dreaming, you see yourself weighted down under massive backpack/tent upon your back, as you pass by a mirrored surface."
+    ],
+    "category": "GASTROPOD",
+    "strength": 2
+  },
+  {
+    "type": "dream",
+    "messages": [
+      "You have a disturbing dream of eating insects.",
+      "While dreaming, you see yourself in a pond, your face has widened and is covered in mucus."
+    ],
+    "category": "BATRACHIAN",
     "strength": 2
   },
   {
@@ -176,21 +271,26 @@
     "type": "dream",
     "messages": [
       "You have a vivid dream of hunting in the woods.",
-      "Whilst dreaming, you see a disturbingly bestial version of yourself."
+      "Whilst dreaming, you see a disturbingly bestial version of yourself.",
+      "You dream of blood and guts.  For some reason, it makes you feel weirdly excited."
     ],
     "category": "BEAST",
     "strength": 2
   },
   {
     "type": "dream",
-    "messages": [ "You dream of foraging in the woods… mouth-first?", "Your dream-reflection is rather bearish." ],
+    "messages": [
+      "You dream of foraging in the woods… mouth-first?",
+      "Your dream-reflection is rather bearish.",
+      "You dream of brushing the fur on your back against a tree."
+    ],
     "category": "URSINE",
     "strength": 2
   },
   {
     "type": "dream",
     "messages": [
-      "You easily bound from the street to a roof..oh, only a dream.",
+      "You easily bound from the street to a roof…oh, only a dream.",
       "As you dream, your reflection looks rather catlike."
     ],
     "category": "FELINE",
@@ -198,7 +298,11 @@
   },
   {
     "type": "dream",
-    "messages": [ "You have a disturbing dream of someone invading your territory.", "Your dream-self's muzzle looks… wait, muzzle?" ],
+    "messages": [
+      "You have a disturbing dream of someone invading your territory.",
+      "Your dream-self's muzzle looks… wait, muzzle?",
+      "You dream of the moon and feel a sudden urge to howl."
+    ],
     "category": "LUPINE",
     "strength": 2
   },
@@ -215,7 +319,8 @@
     "type": "dream",
     "messages": [
       "You have a dream of working in a hive.",
-      "While dreaming you look into a mirror and see a frighteningly insectoid reflection."
+      "While dreaming you look into a mirror and see a frighteningly insectoid reflection.",
+      "You dream of a feast and excitedly chitter with your pincers… wait, what?"
     ],
     "category": "INSECT",
     "strength": 2
@@ -224,7 +329,8 @@
     "type": "dream",
     "messages": [
       "You have a confusing dream of growing in a garden.",
-      "You are confused by a plantlike image of yourself in a dream."
+      "You are confused by a plantlike image of yourself in a dream.",
+      "You dream of standing still in the rain, drinking in the falling drops… with your feet?"
     ],
     "category": "PLANT",
     "strength": 2
@@ -237,7 +343,11 @@
   },
   {
     "type": "dream",
-    "messages": [ "You dream of living deep inside a dark cave.", "You dream of being a primitive cave dweller." ],
+    "messages": [
+      "You dream of living deep inside a dark cave.",
+      "You dream you crawl out from under a rock.  And then immediately crawl back in.",
+      "You dream of being a primitive cave dweller."
+    ],
     "category": "TROGLOBITE",
     "strength": 2
   },
@@ -252,7 +362,11 @@
   },
   {
     "type": "dream",
-    "messages": [ "You have a strange dream of spinning webs", "In your dream you see a very spiderlike version of yourself." ],
+    "messages": [
+      "You have a strange dream of spinning webs.",
+      "In your dream you see a very spiderlike version of yourself.",
+      "You dream of the buzzing of a fly that you cannot see.  It makes you hungry."
+    ],
     "category": "SPIDER",
     "strength": 2
   },
@@ -269,14 +383,19 @@
     "type": "dream",
     "messages": [
       "You dream of having that success you knew you deserved, back before all this.",
-      "Your dream-self looks competent and in control."
+      "Your dream-self looks competent and in control.",
+      "You dream of a fortress, sheltering humanity from the zombies.  You're in charge, of course."
     ],
     "category": "ALPHA",
     "strength": 2
   },
   {
     "type": "dream",
-    "messages": [ "You dream of a home in the forests.", "You feel beautiful, and yet riven with worry..." ],
+    "messages": [
+      "You dream of a home in the forests.",
+      "You dream you are lithe in the sunlight and radiant with grace.",
+      "You feel beautiful, and yet riven with worry…"
+    ],
     "category": "ELFA",
     "strength": 2
   },
@@ -293,7 +412,7 @@
     "type": "dream",
     "messages": [
       "You dream of stalking some sort of lizard… no, that can't be right, can it?",
-      "For some reason you dream of your shoes.  They don't fit, and nothing seems to help..."
+      "For some reason you dream of your shoes.  They don't fit, and nothing seems to help…"
     ],
     "category": "RAPTOR",
     "strength": 2
@@ -302,6 +421,21 @@
     "type": "dream",
     "messages": [ "You dream of… sneaking.", "You dream of a cold winter night.  Your jacket is too big to put on." ],
     "category": "MOUSE",
+    "strength": 2
+  },
+  {
+    "type": "dream",
+    "messages": [
+      "You dream of walking along the sea floor.",
+      "You dream of something biting you but being stopped by your hard outer shell."
+    ],
+    "category": "CRUSTACEAN",
+    "strength": 2
+  },
+  {
+    "type": "dream",
+    "messages": [ "You dream you fly across a field of stars.", "You dream of multicolor, strange, distant places." ],
+    "category": "INTERSTICE",
     "strength": 2
   },
   {
@@ -316,8 +450,18 @@
   {
     "type": "dream",
     "messages": [
+      "You have a strange dream about being the Easter Bunny.",
+      "You have a comforting and warm dream of living as a rabbit."
+    ],
+    "category": "RABBIT",
+    "strength": 3
+  },
+  {
+    "type": "dream",
+    "messages": [
       "You have a dream of doctors and nurses doing unnatural things to your body, which brings you perverse pleasure.",
-      "You have a vivid dream of being a medical anomaly, as your heartbeat syncs with the steady drip of an IV line."
+      "You have a vivid dream of being a medical anomaly, as your heartbeat syncs with the steady drip of an IV line.",
+      "You dream of cutting yourself with a knife and watch in fascination as it heals in seconds."
     ],
     "category": "MEDICAL",
     "strength": 3
@@ -334,10 +478,39 @@
   {
     "type": "dream",
     "messages": [
+      "You have a nightmare of being all alone, but then your family flies home to comfort you.",
+      "You dream of sneaking into someone's home to listen to them sleep.",
+      "You taste iron all night long, like you've bitten your tongue.",
+      "You dream in sounds and smells, not images."
+    ],
+    "category": "CHIROPTERAN",
+    "strength": 3
+  },
+  {
+    "type": "dream",
+    "messages": [
       "You have a disturbing dream of swimming with a school of fish.",
       "When you wake up you panic about drowning from being out of water."
     ],
     "category": "FISH",
+    "strength": 3
+  },
+  {
+    "type": "dream",
+    "messages": [
+      "You dream of leaping from the water to catch your prey.",
+      "You wake up with your legs pumping as you hop along in your sleep."
+    ],
+    "category": "BATRACHIAN",
+    "strength": 3
+  },
+  {
+    "type": "dream",
+    "messages": [
+      "You dream of crawling along the world when you realize you can see three hundred and sixty degrees around yourself.",
+      "You dream of curling up inside a shell to sleep."
+    ],
+    "category": "GASTROPOD",
     "strength": 3
   },
   {
@@ -456,13 +629,22 @@
   },
   {
     "type": "dream",
-    "messages": [ "NO!  You will not allow this corruption to prevail!", "You see yourself reflected in the beauty of the forest." ],
+    "messages": [
+      "NO!  You will not allow this corruption to prevail!",
+      "You see yourself reflected in the beauty of the forest.",
+      "In your sleep you feel verdant energy growing within you."
+    ],
     "category": "ELFA",
     "strength": 3
   },
   {
     "type": "dream",
-    "messages": [ "You are many animals, and yet one.", "Hoof.  Talon.  Tooth.  Fight.  Feed.  Forward." ],
+    "messages": [
+      "You dream of the hunt to end all hunts.",
+      "You are many animals, and yet one.",
+      "You swim with fish.  You fly with birds.  You run with the beasts of the land.  You change with the changing of seasons.  You are everything.",
+      "Hoof.  Talon.  Tooth.  Fight.  Feed.  Forward."
+    ],
     "category": "CHIMERA",
     "strength": 3
   },
@@ -478,10 +660,28 @@
   {
     "type": "dream",
     "messages": [
-      "You weave between the zombies' legs, too small for them to catch.  The gas station isn't far now, with all its soda and chips and- UGH, dream...",
+      "You weave between the zombies' legs, too small for them to catch.  The gas station isn't far now, with all its soda and chips and- UGH, dream…",
       "Once you finish your tasty dinner of seeds, you look around for your drink, but you already ate it."
     ],
     "category": "MOUSE",
+    "strength": 3
+  },
+  {
+    "type": "dream",
+    "messages": [
+      "You have a disturbing dream of living in a supermarket lobster tank.",
+      "Your vivid dream of living as a crustacean frightens you."
+    ],
+    "category": "CRUSTACEAN",
+    "strength": 3
+  },
+  {
+    "type": "dream",
+    "messages": [
+      "The contours of some unknown knowledge tickles at your mind.  It hurts.",
+      "You have a vivid nightmare of a mirror image of yourself, blank, screaming silence."
+    ],
+    "category": "INTERSTICE",
     "strength": 3
   },
   {
@@ -510,6 +710,12 @@
   },
   {
     "type": "dream",
+    "messages": [ "Will your burrow be warm enough for the family in winter?", "You dream of outrunning the apocalypse." ],
+    "category": "RABBIT",
+    "strength": 4
+  },
+  {
+    "type": "dream",
     "messages": [
       "You have a comforting dream of swimming with a school of fish.",
       "The thought of being out of water, forced to crawl unsupported, terrifies you."
@@ -526,8 +732,9 @@
   {
     "type": "dream",
     "messages": [
-      "You wonder if you could find one of those 'salmon runs', or if they were just a legend...",
-      "Ah, the wolf-slaying dream again.  That's a good one..."
+      "You wonder if you could find one of those 'salmon runs', or if they were just a legend…",
+      "Ah, the wolf-slaying dream again.  That's a good one…",
+      "In the dream, you fatten yourself up with all the food you can find to prepare for your next winter hibernation."
     ],
     "category": "URSINE",
     "strength": 4
@@ -536,7 +743,10 @@
     "type": "dream",
     "messages": [
       "Boing!  and you've pounced another yummy critter.",
-      "Your nightmare of sentient rats turns successful, as you grab their King and shake it apart!"
+      "Your nightmare of sentient rats turns successful, as you grab their King and shake it apart!",
+      "You leap from rooftop to rooftop, effortlessly avoiding your pursuers while making your way to safety.",
+      "You sneak into a house, only to discover a full, intact cupboard of canned tuna!",
+      "You dream of a whole field where only lush catnip grows, and you blissfully roll around in it."
     ],
     "category": "FELINE",
     "strength": 4
@@ -545,7 +755,11 @@
     "type": "dream",
     "messages": [
       "You dream of the hunt, the feed, and your pack.",
-      "Oh, you should really patrol your territory again, maybe expand."
+      "You lead the pack on a glorious hunt, knowing that they will all have your back as you have theirs!",
+      "Oh, you should really patrol your territory again, maybe expand.",
+      "You dream of a rival pack of hairless bipeds intruding upon your territory.  After a fierce battle, their leader lays lifeless on the ground.",
+      "You howl loud and long, ecstatic after securing a whole cache of supplies.",
+      "After recruiting a new packmate, you expand your spacious den to accommodate them."
     ],
     "category": "LUPINE",
     "strength": 4
@@ -554,6 +768,7 @@
     "type": "dream",
     "messages": [
       "You dream of jumping the gate and leading your herd to freedom.",
+      "You bellow on a knoll against the sky, having feasted on the apple time cider.",
       "The herd moves along and you with them, finding greener pastures."
     ],
     "category": "CATTLE",
@@ -562,8 +777,19 @@
   {
     "type": "dream",
     "messages": [
+      "In your dreams, your fangs slip through flesh like scalpels.  You quickly crawl away to let your clumsy prey bleed out.",
+      "You flutter through the air, listening for echoes to guide you through your dream.",
+      "You dream of friends and family crowded around, chattering noisily, grooming one another, and sharing blood."
+    ],
+    "category": "CHIROPTERAN",
+    "strength": 4
+  },
+  {
+    "type": "dream",
+    "messages": [
       "You feel smug, knowing that the Queen is dependent on you.",
-      "You dream of a weirdly shaped plant, whose nectar surpassed your every wish..."
+      "You relax and enjoy the humming adulation of all your followers.",
+      "You dream of a weirdly shaped plant, whose nectar surpassed your every wish…"
     ],
     "category": "INSECT",
     "strength": 4
@@ -588,7 +814,7 @@
     "type": "dream",
     "messages": [
       "Your vivid dream of your pseudopods calcifying into rigid structures terrifies you.",
-      "Ah, the painting-the-planet dream again.  Maybe if you assimilated more..."
+      "Ah, the painting-the-planet dream again.  Maybe if you assimilated more…"
     ],
     "category": "SLIME",
     "strength": 4
@@ -612,6 +838,7 @@
     "type": "dream",
     "messages": [
       "You excitedly web up an interloper and prepare to feast… nope, dream.",
+      "You relax in your web; it's not vibrating, so dinner hasn't arrived yet.",
       "Your dreams of having to live without a web frighten you."
     ],
     "category": "SPIDER",
@@ -620,7 +847,7 @@
   {
     "type": "dream",
     "messages": [
-      "The Fury is so big!  It's GONNA GET YOAAAAAH! *pant* only a dream.",
+      "The Fury is so big!  It's GONNA GET YOAAAAAH!  *pant* only a dream.",
       "You find your paws twitching.  There's a cave.  You should go."
     ],
     "category": "RAT",
@@ -630,6 +857,7 @@
     "type": "dream",
     "messages": [
       "You dream of the peaceful world you'll give humankind.  Because no one else can.",
+      "You crush those who would disagree with the leadership.  Humanity must be united; independence will get you all killed!",
       "There are underground Faults in the world.  Faults you should remedy."
     ],
     "category": "ALPHA",
@@ -639,9 +867,27 @@
     "type": "dream",
     "messages": [
       "You pant, terrified at the thought of that FUNGUS destroying your home!",
-      "You wish others could understand, and join your struggle..."
+      "You wish others could understand, and join your struggle…"
     ],
     "category": "ELFA",
+    "strength": 4
+  },
+  {
+    "type": "dream",
+    "messages": [
+      "There is so much that you never imagined, the slime, the legs, and eyestalks but the shell was worth it.",
+      "You'll always be home, once you take this last step."
+    ],
+    "category": "GASTROPOD",
+    "strength": 4
+  },
+  {
+    "type": "dream",
+    "messages": [
+      "You'd never considered that frogs were generalist predators before this point in your life…",
+      "On land and in the water, you control all that you can reach, and your tongue has quite the reach."
+    ],
+    "category": "BATRACHIAN",
     "strength": 4
   },
   {
@@ -660,9 +906,23 @@
     "type": "dream",
     "messages": [
       "You curl up some more in your nest.  Geez, shredded paper really *is* comfy.",
+      "Oh boy!  This hidey hole sure is swell.",
+      "Once we finish the burrow we'll settle down and start a little family.  Maybe just a dozen boys and a dozen girls.  Nice and cosy.",
+      "In your dreams, you blindly run through the pipes of the city, navigating the familiar byways via smell alone.",
+      "Sneaky sneak under the floorboards.  We will sneak all their crumbs for us.  But later, back to sleep for now.",
       "You hear the sirens again, but this time you stay in your hole in the wall.  Nobody will think to look there!"
     ],
     "category": "MOUSE",
+    "strength": 4
+  },
+  {
+    "type": "dream",
+    "messages": [
+      "You dream of pinching zombies with your claws.",
+      "You have a vivid dream of shedding your carapace.  It feels good.",
+      "You dream of tearing apart some hapless fish with your pincers."
+    ],
+    "category": "CRUSTACEAN",
     "strength": 4
   },
   {
@@ -677,6 +937,12 @@
       "The seething masses attempt to wall non-Mycus away from the Marloss.  We will adapt and defeat them."
     ],
     "category": "MYCUS",
+    "strength": 4
+  },
+  {
+    "type": "dream",
+    "messages": [ "Sleeping is tiresome.", "Existence is tiresome.", "You bask in your forbidden knowledge." ],
+    "category": "INTERSTICE",
     "strength": 4
   }
 ]

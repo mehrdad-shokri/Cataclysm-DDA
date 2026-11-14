@@ -3,9 +3,9 @@
 #define CATA_SRC_AMMO_H
 
 #include <string>
-#include <utility>
 
-#include"type_id.h"
+#include "translation.h"
+#include "type_id.h"
 
 class JsonObject;
 
@@ -13,8 +13,7 @@ class ammunition_type
 {
         friend class DynamicDataLoader;
     public:
-        ammunition_type() = default;
-        explicit ammunition_type( std::string name ) : name_( std::move( name ) ) { }
+        ammunition_type();
 
         std::string name() const;
 
@@ -23,7 +22,7 @@ class ammunition_type
         }
 
     private:
-        std::string name_;
+        translation name_;
         itype_id default_ammotype_;
 
         static void load_ammunition_type( const JsonObject &jsobj );

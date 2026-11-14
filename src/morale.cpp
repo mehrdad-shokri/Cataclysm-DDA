@@ -5,8 +5,10 @@
 #include <cstdlib>
 #include <numeric>
 #include <set>
+#include <string>
 #include <utility>
 
+#include "body_part_set.h"
 #include "bodypart.h"
 #include "cata_utility.h"
 #include "catacharset.h"
@@ -15,10 +17,11 @@
 #include "cursesdef.h"
 #include "debug.h"
 #include "enums.h"
-#include "input.h"
-#include "int_id.h"
+#include "input_context.h"
 #include "item.h"
+#include "localized_comparator.h"
 #include "morale_types.h"
+#include "options.h"
 #include "output.h"
 #include "point.h"
 #include "string_formatter.h"
@@ -30,18 +33,37 @@ static const efftype_id effect_hot( "hot" );
 static const efftype_id effect_took_prozac( "took_prozac" );
 static const efftype_id effect_took_prozac_bad( "took_prozac_bad" );
 
+static const flag_id json_flag_FILTHY( "FILTHY" );
+static const flag_id json_flag_INTEGRATED( "INTEGRATED" );
+
+static const json_character_flag json_flag_HEAT_IMMUNE( "HEAT_IMMUNE" );
+
+static const morale_type morale_cold( "morale_cold" );
+static const morale_type morale_hot( "morale_hot" );
+static const morale_type morale_perm_badtemper( "morale_perm_badtemper" );
+static const morale_type morale_perm_constrained( "morale_perm_constrained" );
+static const morale_type morale_perm_debug( "morale_perm_debug" );
+static const morale_type morale_perm_filthy( "morale_perm_filthy" );
+static const morale_type morale_perm_masochist( "morale_perm_masochist" );
+static const morale_type morale_perm_numb( "morale_perm_numb" );
+static const morale_type morale_perm_optimist( "morale_perm_optimist" );
+static const morale_type morale_perm_radiophile( "morale_perm_radiophile" );
+
 static const trait_id trait_BADTEMPER( "BADTEMPER" );
 static const trait_id trait_CENOBITE( "CENOBITE" );
+static const trait_id trait_CHLOROMORPH( "CHLOROMORPH" );
 static const trait_id trait_FLOWERS( "FLOWERS" );
 static const trait_id trait_LEAVES2( "LEAVES2" );
 static const trait_id trait_LEAVES3( "LEAVES3" );
 static const trait_id trait_MASOCHIST( "MASOCHIST" );
 static const trait_id trait_MASOCHIST_MED( "MASOCHIST_MED" );
+static const trait_id trait_NUMB( "NUMB" );
 static const trait_id trait_OPTIMISTIC( "OPTIMISTIC" );
+static const trait_id trait_RADIOPHILE( "RADIOPHILE" );
 static const trait_id trait_ROOTS1( "ROOTS1" );
 static const trait_id trait_ROOTS2( "ROOTS2" );
 static const trait_id trait_ROOTS3( "ROOTS3" );
-static const trait_id trait_STYLISH( "STYLISH" );
+static const trait_id trait_VANITY( "VANITY" );
 
 namespace
 {
@@ -49,13 +71,14 @@ namespace
 bool is_permanent_morale( const morale_type &id )
 {
     static const std::set<morale_type> permanent_morale = {{
-            MORALE_PERM_OPTIMIST,
-            MORALE_PERM_BADTEMPER,
-            MORALE_PERM_FANCY,
-            MORALE_PERM_MASOCHIST,
-            MORALE_PERM_CONSTRAINED,
-            MORALE_PERM_FILTHY,
-            MORALE_PERM_DEBUG
+            morale_perm_optimist,
+            morale_perm_badtemper,
+            morale_perm_numb,
+            morale_perm_masochist,
+            morale_perm_constrained,
+            morale_perm_filthy,
+            morale_perm_debug,
+            morale_perm_radiophile
         }
     };
 
@@ -68,7 +91,7 @@ bool is_permanent_morale( const morale_type &id )
 struct morale_mult {
     morale_mult(): good( 1.0 ), bad( 1.0 ) {}
     morale_mult( double good, double bad ): good( good ), bad( bad ) {}
-    morale_mult( double both ): good( both ), bad( both ) {}
+    explicit morale_mult( double both ): good( both ), bad( both ) {}
 
     double good;    // For good morale
     double bad;     // For bad morale
@@ -84,23 +107,12 @@ struct morale_mult {
     }
 };
 
-inline double operator * ( double morale, const morale_mult &mult )
+static double operator * ( double morale, const morale_mult &mult )
 {
     return morale * ( ( morale >= 0.0 ) ? mult.good : mult.bad );
 }
 
-inline double operator * ( const morale_mult &mult, double morale )
-{
-    return morale * mult;
-}
-
-inline double operator *= ( double &morale, const morale_mult &mult )
-{
-    morale = morale * mult;
-    return morale;
-}
-
-inline int operator *= ( int &morale, const morale_mult &mult )
+static int operator *= ( int &morale, const morale_mult &mult )
 {
     morale = morale * mult;
     return morale;
@@ -115,6 +127,8 @@ static const morale_mult optimist( 1.2, 0.8 );
 // Again, those grouchy Bad-Tempered folks always focus on the negative.
 // They can't handle positive things as well.  They're No Fun.  D:
 static const morale_mult badtemper( 0.8, 1.2 );
+// Numb characters have trouble feeling anything
+static const morale_mult numb( 0.25, 0.25 );
 // Prozac reduces overall negative morale by 75%.
 static const morale_mult prozac( 1.0, 0.25 );
 // The bad prozac effect reduces good morale by 75%.
@@ -176,9 +190,11 @@ void player_morale::morale_point::add( const int new_bonus, const int new_max_bo
     }
 
     int sqrt_of_sum_of_squares;
-    if( new_cap || !same_sign ) {
+    if( new_duration == 0_turns ) {
+        sqrt_of_sum_of_squares = new_bonus;
+    } else if( new_cap || !same_sign ) {
         // If the morale bonus is capped apply the full bonus
-        // This is because some morale types build up slowly to a cap over time (e.g. MORALE_WET)
+        // This is because some morale types build up slowly to a cap over time (e.g. morale_wet)
         // If the new bonus is opposing apply the full bonus
         sqrt_of_sum_of_squares = get_net_bonus() + new_bonus;
     } else {
@@ -220,8 +236,8 @@ void player_morale::morale_point::decay( const time_duration &ticks )
 
 int player_morale::morale_point::normalize_bonus( int bonus, int max_bonus, bool capped ) const
 {
-    return ( ( std::abs( bonus ) > std::abs( max_bonus ) && ( max_bonus != 0 ||
-               capped ) ) ? max_bonus : bonus );
+    return ( std::abs( bonus ) > std::abs( max_bonus ) && ( max_bonus != 0 ||
+             capped ) ) ? max_bonus : bonus;
 }
 
 bool player_morale::mutation_data::get_active() const
@@ -251,50 +267,75 @@ player_morale::player_morale() :
     level_is_valid( false ),
     took_prozac( false ),
     took_prozac_bad( false ),
-    stylish( false ),
-    perceived_pain( 0 )
+    perceived_pain( 0 ),
+    radiation( 0 )
 {
-    using namespace std::placeholders;
     // Cannot use 'this' because the object is copyable
-    const auto set_optimist       = std::bind( &player_morale::set_permanent, _1, MORALE_PERM_OPTIMIST,
-                                    _2, nullptr );
-    const auto set_badtemper      = std::bind( &player_morale::set_permanent, _1, MORALE_PERM_BADTEMPER,
-                                    _2, nullptr );
-    const auto set_stylish        = std::bind( &player_morale::set_stylish, _1, _2 );
-    const auto update_constrained = std::bind( &player_morale::update_constrained_penalty, _1 );
-    const auto update_masochist   = std::bind( &player_morale::update_masochist_bonus, _1 );
+    const auto set_optimist = []( player_morale * pm, int bonus ) {
+        pm->set_permanent( morale_perm_optimist, bonus, nullptr );
+    };
+    const auto set_badtemper = []( player_morale * pm, int bonus ) {
+        pm->set_permanent( morale_perm_badtemper, bonus, nullptr );
+    };
+    const auto set_numb = []( player_morale * pm, int bonus ) {
+        pm->set_permanent( morale_perm_numb, bonus, nullptr );
+    };
+    const auto update_constrained = []( player_morale * pm ) {
+        pm->update_constrained_penalty();
+    };
+    const auto update_masochist = []( player_morale * pm ) {
+        pm->update_masochist_bonus();
+    };
+    const auto update_radiophile = []( player_morale * pm ) {
+        pm->update_radiophile_bonus();
+    };
 
-    mutations[trait_OPTIMISTIC]    = mutation_data(
-                                         std::bind( set_optimist, _1, 9 ),
-                                         std::bind( set_optimist, _1, 0 ) );
-    mutations[trait_BADTEMPER]     = mutation_data(
-                                         std::bind( set_badtemper, _1, -9 ),
-                                         std::bind( set_badtemper, _1, 0 ) );
-    mutations[trait_STYLISH]       = mutation_data(
-                                         std::bind( set_stylish, _1, true ),
-                                         std::bind( set_stylish, _1, false ) );
+    mutations[trait_OPTIMISTIC] =
+    mutation_data( [set_optimist]( player_morale * pm ) {
+        set_optimist( pm, 9 );
+    },
+    [set_optimist]( player_morale * pm ) {
+        set_optimist( pm, 0 );
+    } );
+    mutations[trait_BADTEMPER] =
+    mutation_data( [set_badtemper]( player_morale * pm ) {
+        set_badtemper( pm, -9 );
+    },
+    [set_badtemper]( player_morale * pm ) {
+        set_badtemper( pm, 0 );
+    } );
+    mutations[trait_NUMB] =
+    mutation_data( [set_numb]( player_morale * pm ) {
+        set_numb( pm, -1 );
+    },
+    [set_numb]( player_morale * pm ) {
+        set_numb( pm, 0 );
+    } );
     mutations[trait_FLOWERS]       = mutation_data( update_constrained );
-    mutations[trait_ROOTS1]         = mutation_data( update_constrained );
+    mutations[trait_ROOTS1]        = mutation_data( update_constrained );
     mutations[trait_ROOTS2]        = mutation_data( update_constrained );
     mutations[trait_ROOTS3]        = mutation_data( update_constrained );
+    mutations[trait_CHLOROMORPH]   = mutation_data( update_constrained );
     mutations[trait_LEAVES2]       = mutation_data( update_constrained );
     mutations[trait_LEAVES3]       = mutation_data( update_constrained );
     mutations[trait_MASOCHIST]     = mutation_data( update_masochist );
     mutations[trait_MASOCHIST_MED] = mutation_data( update_masochist );
     mutations[trait_CENOBITE]      = mutation_data( update_masochist );
+    mutations[trait_RADIOPHILE]    = mutation_data( update_radiophile );
+    mutations[trait_VANITY]        = mutation_data( update_constrained );
 }
 
 void player_morale::add( const morale_type &type, int bonus, int max_bonus,
                          const time_duration &duration, const time_duration &decay_start,
                          bool capped, const itype *item_type )
 {
-    if( ( duration == 0_turns ) & !is_permanent_morale( type ) ) {
+    if( ( duration == 0_turns ) && !is_permanent_morale( type ) ) {
         debugmsg( "Tried to set a non-permanent morale \"%s\" as permanent.",
                   type.obj().describe( item_type ) );
         return;
     }
 
-    for( auto &m : points ) {
+    for( player_morale::morale_point &m : points ) {
         if( m.matches( type, item_type ) ) {
             const int prev_bonus = m.get_net_bonus();
 
@@ -358,15 +399,27 @@ void player_morale::remove_expired()
     } );
 }
 
+std::string player_morale::to_string_writable()
+{
+    std::string str;
+    for( const morale_point mp : points ) {
+        str += string_format( "point: %s, net_bonus: %s\n", mp.get_name(), mp.get_net_bonus() );
+    }
+    return str;
+}
+
 morale_mult player_morale::get_temper_mult() const
 {
     morale_mult mult;
 
-    if( has( MORALE_PERM_OPTIMIST ) ) {
+    if( has( morale_perm_optimist ) ) {
         mult *= morale_mults::optimist;
     }
-    if( has( MORALE_PERM_BADTEMPER ) ) {
+    if( has( morale_perm_badtemper ) ) {
         mult *= morale_mults::badtemper;
+    }
+    if( has( morale_perm_numb ) ) {
+        mult *= morale_mults::numb;
     }
 
     return mult;
@@ -379,7 +432,7 @@ void player_morale::calculate_percentage()
     int sum_of_positive_squares = 0;
     int sum_of_negative_squares = 0;
 
-    for( auto &m : points ) {
+    for( player_morale::morale_point &m : points ) {
         const int bonus = m.get_net_bonus( mult );
         if( bonus > 0 ) {
             sum_of_positive_squares += std::pow( bonus, 2 );
@@ -388,7 +441,7 @@ void player_morale::calculate_percentage()
         }
     }
 
-    for( auto &m : points ) {
+    for( player_morale::morale_point &m : points ) {
         const int bonus = m.get_net_bonus( mult );
         if( bonus > 0 ) {
             m.set_percent_contribution( ( std::pow( bonus, 2 ) / sum_of_positive_squares ) * 100 );
@@ -411,7 +464,7 @@ int player_morale::get_total_negative_value() const
     return std::sqrt( sum );
 }
 
-int player_morale::get_percieved_pain() const
+int player_morale::get_perceived_pain() const
 {
     return perceived_pain;
 }
@@ -474,7 +527,8 @@ void player_morale::decay( const time_duration &ticks )
     invalidate();
 }
 
-void player_morale::display( int focus_eq, int pain_penalty, int fatigue_penalty )
+void player_morale::display( int focus_eq, int pain_penalty, int sleepiness_penalty,
+                             Character &who )
 {
     /*calculates the percent contributions of the morale points,
      * must be done before anything else in this method
@@ -511,7 +565,7 @@ void player_morale::display( int focus_eq, int pain_penalty, int fatigue_penalty
 
         public:
             morale_line() = default;
-            morale_line( const separation_line ) : sep_line( true ) {}
+            explicit morale_line( const separation_line ) : sep_line( true ) {}
             morale_line( const std::string &text, const nc_color &color )
                 : left( text ), color( color ) {}
             morale_line( const std::string &left, const std::string &right,
@@ -566,9 +620,11 @@ void player_morale::display( int focus_eq, int pain_penalty, int fatigue_penalty
             void draw( catacurses::window &w, const int posy ) const {
                 int width = getmaxx( w );
                 if( sep_line ) {
+                    wattron( w, BORDER_COLOR );
                     mvwhline( w, point( 0, posy ), LINE_XXXO, 1 );
                     mvwhline( w, point( 1, posy ), 0, width - 2 );
                     mvwhline( w, point( width - 1, posy ), LINE_XOXX, 1 );
+                    wattroff( w, BORDER_COLOR );
                 } else {
                     int text_width = width - left_padding - right_padding;
                     if( !right.empty() ) {
@@ -606,7 +662,7 @@ void player_morale::display( int focus_eq, int pain_penalty, int fatigue_penalty
     const std::vector<morale_line> top_lines {
         {},
         { _( "Morale" ), c_white },
-        { morale_line::separation_line {} },
+        morale_line{ morale_line::separation_line {} },
 
         positive_morale.empty() &&negative_morale.empty() ?
         morale_line( _( "Nothing affects your morale" ), c_dark_gray ) :
@@ -651,11 +707,23 @@ void player_morale::display( int focus_eq, int pain_penalty, int fatigue_penalty
     }
 
     std::vector<morale_line> bottom_lines;
+    bottom_lines.reserve( 6 ); // We need 6 lines for everything.
     bottom_lines.emplace_back( morale_line::separation_line {} );
     bottom_lines.emplace_back(
-        _( "Total morale:" ), get_level(),
+        // NOTE: We can't use morale_level() directly here, but must access it through the getter. Otherwise, we aren't accounting for possible modifiers.
+        _( "Total morale:" ), who.get_morale_level(),
         morale_line::number_format::signed_or_dash,
         morale_line::line_color::green_gray_red
+    );
+    std::string deaden_display_msg = _( "Deadened.  All morale modified to:" );
+    if( get_option<bool>( "CRAZY" ) ) {
+        //~This is for the crazy cataclysm mod, it is an off-beat display message for how "deadened" a Character's psyche is. It tracks whether the character "gives a shit".
+        deaden_display_msg = _( "Shits given:" );
+    }
+    bottom_lines.emplace_back(
+        deaden_display_msg, static_cast<int>( who.get_modifier_for_ALL_morale() * 100.0 ),
+        morale_line::number_format::percent,
+        morale_line::line_color::normal
     );
     if( pain_penalty != 0 ) {
         bottom_lines.emplace_back(
@@ -664,9 +732,9 @@ void player_morale::display( int focus_eq, int pain_penalty, int fatigue_penalty
             morale_line::line_color::green_gray_red
         );
     }
-    if( fatigue_penalty != 0 ) {
+    if( sleepiness_penalty != 0 ) {
         bottom_lines.emplace_back(
-            _( "Fatigue level:" ), -fatigue_penalty,
+            _( "Sleepiness level:" ), -sleepiness_penalty,
             morale_line::number_format::signed_or_dash,
             morale_line::line_color::green_gray_red
         );
@@ -785,7 +853,7 @@ void player_morale::display( int focus_eq, int pain_penalty, int fatigue_penalty
 bool player_morale::consistent_with( const player_morale &morale ) const
 {
     const auto test_points = []( const player_morale & lhs, const player_morale & rhs ) {
-        for( const auto &lhp : lhs.points ) {
+        for( const player_morale::morale_point &lhp : lhs.points ) {
             if( !lhp.is_permanent() ) {
                 continue;
             }
@@ -810,15 +878,45 @@ bool player_morale::consistent_with( const player_morale &morale ) const
     } else if( took_prozac_bad != morale.took_prozac_bad ) {
         debugmsg( "player_morale::took_prozac (bad) is inconsistent." );
         return false;
-    } else if( stylish != morale.stylish ) {
-        debugmsg( "player_morale::stylish is inconsistent." );
-        return false;
     } else if( perceived_pain != morale.perceived_pain ) {
         debugmsg( "player_morale::perceived_pain is inconsistent." );
+        return false;
+    } else if( radiation != morale.radiation ) {
+        debugmsg( "player_morale::radiation is inconsistent." );
         return false;
     }
 
     return test_points( *this, morale ) && test_points( morale, *this );
+}
+
+void player_morale::sync_permanent( const player_morale &reference )
+{
+    // Remove all permanent points, keep temporaries
+    const auto new_end = std::remove_if( points.begin(), points.end(),
+    []( const morale_point & mp ) {
+        return mp.is_permanent();
+    } );
+    points.erase( new_end, points.end() );
+
+    // Copy permanent points from reference
+    for( const morale_point &mp : reference.points ) {
+        if( mp.is_permanent() ) {
+            points.push_back( mp );
+        }
+    }
+
+    // Sync non-point state that consistent_with() checks
+    took_prozac = reference.took_prozac;
+    took_prozac_bad = reference.took_prozac_bad;
+    perceived_pain = reference.perceived_pain;
+    radiation = reference.radiation;
+
+    // Sync mutation and body part state for correct future updates
+    body_parts = reference.body_parts;
+    no_body_part = reference.no_body_part;
+    mutations = reference.mutations;
+
+    invalidate();
 }
 
 void player_morale::clear()
@@ -831,8 +929,6 @@ void player_morale::clear()
     }
     took_prozac = false;
     took_prozac_bad = false;
-    stylish = false;
-    super_fancy_items.clear();
 
     invalidate();
 }
@@ -846,6 +942,11 @@ bool player_morale::has_mutation( const trait_id &mid )
 {
     const auto &mutation = mutations.find( mid );
     return ( mutation != mutations.end() && mutation->second.get_active() );
+}
+
+bool player_morale::has_flag( const json_character_flag &flag )
+{
+    return get_player_character().has_flag( flag );
 }
 
 void player_morale::set_mutation( const trait_id &mid, bool active )
@@ -871,6 +972,10 @@ void player_morale::on_stat_change( const std::string &stat, int value )
     if( stat == "perceived_pain" ) {
         perceived_pain = value;
         update_masochist_bonus();
+    }
+    if( stat == "radiation" ) {
+        radiation = value;
+        update_radiophile_bonus();
     }
 }
 
@@ -914,33 +1019,31 @@ void player_morale::on_worn_item_washed( const item &it )
 void player_morale::on_effect_int_change( const efftype_id &eid, int intensity,
         const bodypart_id &bp )
 {
-    const bodypart_id bp_null( "bp_null" );
-    if( eid == effect_took_prozac && bp == bp_null ) {
+    if( eid == effect_took_prozac && bp == bodypart_str_id::NULL_ID() ) {
         set_prozac( intensity != 0 );
-    } else if( eid == effect_took_prozac_bad && bp == bp_null ) {
+    } else if( eid == effect_took_prozac_bad && bp == bodypart_str_id::NULL_ID() ) {
         set_prozac_bad( intensity != 0 );
-    } else if( eid == effect_cold && bp != bp_null ) {
+    } else if( eid == effect_cold && bp != bodypart_str_id::NULL_ID() ) {
         body_parts[bp].cold = intensity;
-    } else if( eid == effect_hot && bp != bp_null ) {
+    } else if( eid == effect_hot && bp != bodypart_str_id::NULL_ID() ) {
         body_parts[bp].hot = intensity;
     }
 }
 
 void player_morale::set_worn( const item &it, bool worn )
 {
-    const bool fancy = it.has_flag( "FANCY" );
-    const bool super_fancy = it.has_flag( "SUPER_FANCY" );
-    const bool filthy_gear = it.has_flag( "FILTHY" );
-    const int sign = ( worn ) ? 1 : -1;
+    const bool filthy_gear = it.has_flag( json_flag_FILTHY );
+    const bool integrated = it.has_flag( json_flag_INTEGRATED );
+    const int sign = worn ? 1 : -1;
 
     const auto update_body_part = [&]( body_part_data & bp_data ) {
-        if( fancy || super_fancy ) {
-            bp_data.fancy += sign;
-        }
         if( filthy_gear ) {
             bp_data.filthy += sign;
         }
-        bp_data.covered += sign;
+        // If armor is integrated (Subdermal CBM, Skin armor mutation) don't count it as covering
+        if( !integrated ) {
+            bp_data.covered += sign;
+        }
     };
 
     const body_part_set covered( it.get_covered_body_parts() );
@@ -955,24 +1058,6 @@ void player_morale::set_worn( const item &it, bool worn )
         update_body_part( no_body_part );
     }
 
-    if( super_fancy ) {
-        const auto id = it.typeId();
-        const auto iter = super_fancy_items.find( id );
-
-        if( iter != super_fancy_items.end() ) {
-            iter->second += sign;
-            if( iter->second == 0 ) {
-                super_fancy_items.erase( iter );
-            }
-        } else if( worn ) {
-            super_fancy_items[id] = 1;
-        } else {
-            debugmsg( "Tried to take off \"%s\" which isn't worn.", id.c_str() );
-        }
-    }
-    if( fancy || super_fancy ) {
-        update_stylish_bonus();
-    }
     if( filthy_gear ) {
         update_squeamish_penalty();
     }
@@ -996,31 +1081,6 @@ void player_morale::set_prozac_bad( bool new_took_prozac_bad )
     }
 }
 
-void player_morale::set_stylish( bool new_stylish )
-{
-    if( stylish != new_stylish ) {
-        stylish = new_stylish;
-        update_stylish_bonus();
-    }
-}
-
-void player_morale::update_stylish_bonus()
-{
-    int bonus = 0;
-
-    if( stylish ) {
-        float tmp_bonus = 0.0f;
-        for( const std::pair<const bodypart_id, body_part_data> &bpt : body_parts ) {
-            if( bpt.second.fancy > 0 ) {
-                tmp_bonus += bpt.first->stylish_bonus;
-            }
-        }
-        bonus = std::min( static_cast<int>( 2 * super_fancy_items.size() ) +
-                          2 * std::min( static_cast<int>( no_body_part.fancy ), 3 ) + static_cast<int>( tmp_bonus ), 20 );
-    }
-    set_permanent( MORALE_PERM_FANCY, bonus );
-}
-
 void player_morale::update_masochist_bonus()
 {
     const bool amateur_masochist = has_mutation( trait_MASOCHIST );
@@ -1039,7 +1099,19 @@ void player_morale::update_masochist_bonus()
             bonus = bonus / 2;
         }
     }
-    set_permanent( MORALE_PERM_MASOCHIST, bonus );
+    set_permanent( morale_perm_masochist, bonus );
+}
+
+void player_morale::update_radiophile_bonus()
+{
+    const bool is_radiophile = has_mutation( trait_RADIOPHILE );
+
+    int bonus = 0;
+
+    if( is_radiophile ) {
+        bonus = radiation / 20;
+    }
+    set_permanent( morale_perm_radiophile, bonus );
 }
 
 void player_morale::update_bodytemp_penalty( const time_duration &ticks )
@@ -1052,11 +1124,11 @@ void player_morale::update_bodytemp_penalty( const time_duration &ticks )
         max_hot_penalty += body_parts[bp].hot * bp->hot_morale_mod;
     }
     if( max_cold_penalty != 0.0f ) {
-        add( MORALE_COLD, -2 * to_turns<int>( ticks ), -std::abs( max_cold_penalty ), 1_minutes, 30_seconds,
+        add( morale_cold, -2 * to_turns<int>( ticks ), -std::abs( max_cold_penalty ), 1_minutes, 30_seconds,
              true );
     }
-    if( max_hot_penalty != 0 ) {
-        add( MORALE_HOT, -2 * to_turns<int>( ticks ), -std::abs( max_hot_penalty ), 1_minutes, 30_seconds,
+    if( max_hot_penalty != 0 && !has_flag( json_flag_HEAT_IMMUNE ) ) {
+        add( morale_hot, -2 * to_turns<int>( ticks ), -std::abs( max_hot_penalty ), 1_minutes, 30_seconds,
              true );
     }
 }
@@ -1068,11 +1140,15 @@ void player_morale::update_constrained_penalty()
     };
     int pen = 0;
 
+    if( has_mutation( trait_VANITY ) ) {
+        pen += bp_pen( bodypart_id( "mouth" ), 5 );
+        pen += bp_pen( bodypart_id( "eyes" ), 5 );
+    }
     if( has_mutation( trait_FLOWERS ) ) {
         pen += bp_pen( bodypart_id( "head" ), 10 );
     }
     if( has_mutation( trait_ROOTS1 ) || has_mutation( trait_ROOTS2 ) ||
-        has_mutation( trait_ROOTS3 ) ) {
+        has_mutation( trait_ROOTS3 ) || has_mutation( trait_CHLOROMORPH ) ) {
         pen += bp_pen( bodypart_id( "foot_l" ), 5 );
         pen += bp_pen( bodypart_id( "foot_r" ), 5 );
     }
@@ -1080,7 +1156,7 @@ void player_morale::update_constrained_penalty()
         pen += bp_pen( bodypart_id( "arm_l" ), 5 );
         pen += bp_pen( bodypart_id( "arm_r" ), 5 );
     }
-    set_permanent( MORALE_PERM_CONSTRAINED, -std::min( pen, 10 ) );
+    set_permanent( morale_perm_constrained, -std::min( pen, 10 ) );
 }
 
 void player_morale::update_squeamish_penalty()
@@ -1092,5 +1168,5 @@ void player_morale::update_squeamish_penalty()
         }
     }
     penalty += 2 * std::min( static_cast<int>( no_body_part.filthy ), 3 );
-    set_permanent( MORALE_PERM_FILTHY, -penalty );
+    set_permanent( morale_perm_filthy, -penalty );
 }

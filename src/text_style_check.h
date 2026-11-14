@@ -55,6 +55,7 @@ void text_style_check( Iter beg, Iter end,
             // remove unnecessary spaces before the symbol
             size_t fix_before_max = 0;
         } spaces;
+        // NOLINTBEGIN(readability-redundant-member-init)
         struct {
             bool yes = false;
             std::string str {};
@@ -62,11 +63,12 @@ void text_style_check( Iter beg, Iter end,
             std::string sym_desc {};
             std::string replace_desc {};
         } replace;
+        // NOLINTEND(readability-redundant-member-init)
     };
     // always put the longest (in u32) symbols at the front, since we'll iterate
     // and search for them in this order.
     // *INDENT-OFF*
-    static const std::array<punctuation, 14> punctuations = {{
+    static const std::array<punctuation, 19> punctuations = {{
         // symbol,follow,    spaces,                                 replace,
         //                    check,  len, num spc,  end,start,before    yes,   string,     escaped,  symbol desc,      replc desc
         { U"...",    U"",   {  true, 0, 1, 0, 0, 0, 2, 2, 2, 2, 0 }, {  true, "\u2026", R"(\u2026)", "three dots",      "ellipsis" } },
@@ -74,12 +76,17 @@ void text_style_check( Iter beg, Iter end,
         { U"!=",     U"",   { false,                              }, { false,                                                      } },
         { U"\r\n",   U"",   { false,                              }, {  true, R"(\n)",  R"(\n)",     "carriage return", "new line" } },
         { U"\u2026", U"",   {  true, 0, 1, 0, 0, 0, 2, 2, 2, 2, 0 }, { false,                                                      } },
-        { U".",      U"",   {  true, 0, 3, 1, 3, 2, 0, 2, 0, 0, 0 }, { false,                                                      } },
+        { U"‘",      U"",   { false,                              }, {  true,     "'",     "'",  "left single quote", "single quote" } },
+        { U"’",      U"",   { false,                              }, {  true,     "'",     "'", "right single quote", "single quote" } },
+        { U"“",      U"",   { false,                              }, {  true, R"(\")", R"(\")",  "left double quote", "double quote" } },
+        { U"”",      U"",   { false,                              }, {  true, R"(\")", R"(\")", "right double quote", "double quote" } },
+        { U".",      U"",   {  true, 0, 3, 1, 3, 2, 2, 2, 0, 0, 0 }, { false,                                                      } },
         { U";",      U"",   {  true, 0, 1, 1, 2, 1, 1, 1, 0, 0, 1 }, { false,                                                      } },
         { U"!",      U"!?", {  true, 0, 1, 1, 3, 2, 2, 2, 0, 0, 1 }, { false,                                                      } },
         { U"?",      U"!?", {  true, 0, 1, 1, 3, 2, 2, 2, 0, 0, 1 }, { false,                                                      } },
         { U":",      U"",   {  true, 0, 1, 1, 1, 1, 0, 1, 0, 0, 0 }, { false,                                                      } },
         { U",",      U"",   {  true, 0, 1, 1, 2, 1, 0, 1, 0, 0, 1 }, { false,                                                      } },
+        { U"�",      U"",   { false,                              }, {  true, "\u2026", R"(\u2026)", "replacement character", "ANYTHING" } },
         { U"\r",     U"",   { false,                              }, {  true, R"(\n)",  R"(\n)",     "carriage return", "new line" } },
         { U"\n",     U"",   {  true, 0, 0, 0, 0, 0, 1, 1, 0, 0, 1 }, { false,                                                      } },
         { U"\t",     U"",   { false,                              }, {  true, "    ",   "    ",      "tab",             "spaces"   } },
@@ -87,11 +94,11 @@ void text_style_check( Iter beg, Iter end,
     // *INDENT-ON*
 
     const size_t text_length = std::distance( beg, end );
-    for( auto it = beg; it < end; ) {
-        auto itpunc = it;
+    for( Iter it = beg; it < end; ) {
+        Iter itpunc = it;
         auto punc = punctuations.begin();
         for( ; punc < punctuations.end(); ++punc ) {
-            auto itpuncend = it;
+            Iter itpuncend = it;
             bool matches = true;
             for( auto isym = punc->symbol.begin(); isym < punc->symbol.end(); ++isym, ++itpuncend ) {
                 if( itpuncend >= end || *isym != *itpuncend ) {
@@ -123,7 +130,7 @@ void text_style_check( Iter beg, Iter end,
         }
         if( punc->spaces.check && text_length >= punc->spaces.min_string_length ) {
             size_t spacesbefore = 0;
-            auto itspacebefore = itpunc;
+            Iter itspacebefore = itpunc;
             for( ; itspacebefore > beg; --itspacebefore, ++spacesbefore ) {
                 const uint32_t ch = *( itspacebefore - 1 );
                 if( ch != U' ' ) {
@@ -136,7 +143,7 @@ void text_style_check( Iter beg, Iter end,
                              beg, end, itpunc, itspacebefore, itpunc, {} );
             }
             size_t wordlen = 0;
-            for( auto itword = itpunc; itword > beg; --itword, ++wordlen ) {
+            for( Iter itword = itpunc; itword > beg; --itword, ++wordlen ) {
                 const uint32_t ch = *( itword - 1 );
                 if( ( ch < U'a' || ch > U'z' ) && ( ch < U'A' || ch > U'Z' ) &&
                     ( ch < U'0' || ch > U'9' ) && ch != U'-' ) {
@@ -144,7 +151,7 @@ void text_style_check( Iter beg, Iter end,
                 }
             }
             bool after_word = wordlen >= punc->spaces.min_word_length;
-            auto itspaceend = it;
+            Iter itspaceend = it;
             size_t spacelen = 0;
             for( ; itspaceend < end && *itspaceend == U' '; ++itspaceend, ++spacelen ) {
             }

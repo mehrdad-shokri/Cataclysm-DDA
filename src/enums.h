@@ -15,7 +15,13 @@ constexpr inline int sgn( const T x )
 enum class aim_exit : int {
     none = 0,
     okay,
-    re_entry
+    re_entry,
+    last
+};
+
+template<>
+struct enum_traits<aim_exit> {
+    static constexpr aim_exit last = aim_exit::last;
 };
 
 // be explicit with the values
@@ -23,28 +29,34 @@ enum class aim_entry : int {
     START     = 0,
     VEHICLE   = 1,
     MAP       = 2,
-    RESET     = 3
+    RESET     = 3,
+    last
+};
+
+template<>
+struct enum_traits<aim_entry> {
+    static constexpr aim_entry last = aim_entry::last;
 };
 
 using I = std::underlying_type_t<aim_entry>;
-static constexpr aim_entry &operator++( aim_entry &lhs )
+inline constexpr aim_entry &operator++( aim_entry &lhs )
 {
     lhs = static_cast<aim_entry>( static_cast<I>( lhs ) + 1 );
     return lhs;
 }
 
-static constexpr aim_entry &operator--( aim_entry &lhs )
+inline constexpr aim_entry &operator--( aim_entry &lhs )
 {
     lhs = static_cast<aim_entry>( static_cast<I>( lhs ) - 1 );
     return lhs;
 }
 
-static constexpr aim_entry operator+( const aim_entry &lhs, const I &rhs )
+inline constexpr aim_entry operator+( const aim_entry &lhs, const I &rhs )
 {
     return static_cast<aim_entry>( static_cast<I>( lhs ) + rhs );
 }
 
-static constexpr aim_entry operator-( const aim_entry &lhs, const I &rhs )
+inline constexpr aim_entry operator-( const aim_entry &lhs, const I &rhs )
 {
     return static_cast<aim_entry>( static_cast<I>( lhs ) - rhs );
 }
@@ -60,6 +72,37 @@ enum class bionic_ui_sort_mode : int {
 template<>
 struct enum_traits<bionic_ui_sort_mode> {
     static constexpr bionic_ui_sort_mode last = bionic_ui_sort_mode::nsort;
+};
+
+enum class veh_spawn_status : int {
+    DEFAULT_LIGHT_DMG = -1, // light damage (DEFAULT)
+    UNDAMAGED = 0, // Undamaged
+    DISABLED = 1, // disabled: destroyed seats, controls, tanks, tires, OR engine
+    PRISTINE = 2, // undamaged with no faults or security
+    LAST = 3
+};
+
+// default is sorting by distance
+enum class surroundings_menu_sort_flags : int {
+    DEFAULT       = 0,
+    NAME          = 1 << 0,
+    CATEGORY      = 1 << 1,
+    CATEGORY_NAME = NAME | CATEGORY, // this is currently needed to cycle through the option
+    count
+};
+
+template<>
+struct enum_traits<surroundings_menu_sort_flags> {
+    static constexpr surroundings_menu_sort_flags first = surroundings_menu_sort_flags::DEFAULT;
+    static constexpr surroundings_menu_sort_flags last = surroundings_menu_sort_flags::count;
+    static constexpr bool is_flag_enum = true;
+};
+
+// When bool is not enough. NONE, SOME or ALL
+enum class trinary : int {
+    NONE = 0,
+    SOME = 1,
+    ALL  = 2
 };
 
 enum class holiday : int {
@@ -112,6 +155,9 @@ enum class ot_match_type : int {
     // terrain id, which means that suffixes for rotation and linear terrain types
     // are ignored.
     type,
+    // The provided string must completely match the base type id of the overmap
+    // terrain id as well as the linear subtype.
+    subtype,
     // The provided string must be a complete prefix (with additional parts delimited
     // by an underscore) of the overmap terrain id. For example, "forest" will match
     // "forest" or "forest_thick" but not "forestcabin".
@@ -128,10 +174,21 @@ struct enum_traits<ot_match_type> {
     static constexpr ot_match_type last = ot_match_type::num_ot_match_type;
 };
 
+using accessor_flags = int;
+
+enum accessor_flags_ {
+    Access_None                       = 0,           // You probably don't want to use this!
+    Access_Inventory                  = 1 << 0,      // Only character's inventory
+    Access_Map_Around                 = 1 << 1,      // Items in radius PICKUP_RANGE around character (only reachable)
+    Access_Map_Current_Z              = 1 << 2,      // Everything on the current z-level (ignores reachability)
+    Access_Map_All                    = 1 << 3,      // Everything on the map, all z-levels (ignores reachability)
+    Access_Vehicle                    = 1 << 4,      // Everything on vehicles in the bubble *owned by that guy's faction* (ignores reachability)
+    Access_EVERYTHING                 = Access_Inventory | Access_Map_All | Access_Vehicle      // All of the above
+};
+
 enum class special_game_type : int {
     NONE = 0,
     TUTORIAL,
-    DEFENSE,
     NUM_SPECIAL_GAME_TYPES
 };
 
@@ -239,6 +296,7 @@ enum class object_type : int {
     FIELD,     // field.h; field_entry
     TERRAIN,   // Not a real object
     FURNITURE, // Not a real object
+    FURNITURE_ON_VEHICLE, // least real
     NUM_OBJECT_TYPES,
 };
 
@@ -269,9 +327,9 @@ enum class layer_level : int {
     /* "Personal effects" layer, corresponds to PERSONAL flag */
     PERSONAL = 0,
     /* "Close to skin" layer, corresponds to SKINTIGHT flag. */
-    UNDERWEAR,
-    /* "Normal" layer, default if no flags set */
-    REGULAR,
+    SKINTIGHT,
+    /* "Normal" layer, default if no flags set, also if NORMAL flag is used*/
+    NORMAL,
     /* "Waist" layer, corresponds to WAIST flag. */
     WAIST,
     /* "Outer" layer, corresponds to OUTER flag. */
@@ -306,6 +364,22 @@ enum class distraction_type : int {
     asthma,
     motion_alarm,
     weather_change,
+    portal_storm_popup,
+    eoc,
+    dangerous_field,
+    hunger,
+    thirst,
+    temperature,
+    mutation,
+    oxygen,
+    withdrawal,
+    craft_step_complete,
+    last,
+};
+
+template<>
+struct enum_traits<distraction_type> {
+    static constexpr distraction_type last = distraction_type::last;
 };
 
 enum game_message_type : int {
@@ -316,7 +390,7 @@ enum game_message_type : int {
     m_warning, /* warns the player about a danger. e.g. enemy appeared, an alarm sounds, noise heard. */
     m_info,    /* informs the player about something, e.g. on examination, seeing an item,
                   about how to use a certain function, etc. */
-    m_neutral,  /* neutral or indifferent events which aren’t informational or nothing really happened e.g.
+    m_neutral,  /* neutral or indifferent events which aren't informational or nothing really happened e.g.
                   a miss, a non-critical failure. May also effect for good or bad effects which are
                   just very slight to be notable. This is the default message type. */
 
@@ -343,6 +417,7 @@ enum game_message_flags {
 /** Structure allowing a combination of `game_message_type` and `game_message_flags`.
  */
 struct game_message_params {
+    // NOLINTNEXTLINE(google-explicit-constructor)
     game_message_params( const game_message_type message_type ) : type( message_type ),
         flags( gmf_none ) {}
     game_message_params( const game_message_type message_type,
@@ -352,6 +427,50 @@ struct game_message_params {
     game_message_type type;
     /* Flags pertaining to the message */
     game_message_flags flags;
+};
+
+struct social_modifiers {
+    int lie = 0;
+    int persuade = 0;
+    int intimidate = 0;
+
+    social_modifiers &operator+=( const social_modifiers &other ) {
+        this->lie += other.lie;
+        this->persuade += other.persuade;
+        this->intimidate += other.intimidate;
+        return *this;
+    }
+    bool empty() const {
+        return this->lie != 0 || this->persuade != 0 || this->intimidate != 0;
+    }
+};
+
+enum MULTITILE_TYPE {
+    center,
+    corner,
+    edge,
+    t_connection,
+    end_piece,
+    unconnected,
+    open_,
+    broken,
+    num_multitile_types
+};
+
+enum class reachability_cache_quadrant : int {
+    NE, SE, NW, SW
+};
+
+template<>
+struct enum_traits<reachability_cache_quadrant> {
+    static constexpr reachability_cache_quadrant last = reachability_cache_quadrant::SW;
+    static constexpr int size = static_cast<int>( last ) + 1;
+
+    inline static reachability_cache_quadrant quadrant( bool S, bool W ) {
+        return static_cast<reachability_cache_quadrant>(
+                   ( static_cast<int>( W ) << 1 ) | static_cast<int>( S )
+               );
+    }
 };
 
 enum class monotonically : int {
@@ -370,5 +489,104 @@ constexpr bool is_decreasing( monotonically m )
 {
     return m == monotonically::constant || m == monotonically::decreasing;
 }
+
+enum class character_type : int {
+    CUSTOM,
+    RANDOM,
+    TEMPLATE,
+    NOW,
+    FULL_RANDOM,
+};
+
+enum class aggregate_type : int {
+    FIRST,
+    LAST,
+    MIN,
+    MAX,
+    SUM,
+    AVERAGE,
+    num_aggregate_types
+};
+
+template<>
+struct enum_traits<aggregate_type> {
+    static constexpr aggregate_type last = aggregate_type::num_aggregate_types;
+};
+
+enum class link_state : int {
+    no_link = 0,     // No connection, the default state
+    needs_reeling,   // Cable has been disconnected and needs to be manually reeled in before it can be used again
+    ups,             // Linked to a UPS the cable holder is holding
+    solarpack,       // Linked to a solarpack the cable holder is wearing
+    vehicle_port,    // Linked to a vehicle's cable ports / electrical controls or an appliance
+    vehicle_battery, // Linked to a vehicle's battery or an appliance
+    bio_cable,       // Linked to the cable holder's cable system bionic - source if connected to a vehicle, target otherwise
+    vehicle_tow,     // Linked to a valid tow point on a vehicle - source if it's the towing vehicle, target if the towed one
+    automatic,       // Use in link_to() to automatically set the type of connection based on the connected vehicle part. Is always true as a link_has_states() parameter.
+    last
+};
+template<>
+struct enum_traits<link_state> {
+    static constexpr link_state last = link_state::last;
+};
+
+enum mut_count_type {
+    POSITIVE,
+    NEGATIVE,
+    ALL
+};
+
+enum class bp_type {
+    // this is where helmets go, and is a vital part.
+    head,
+    // the torso is generally the center of mass of a creature
+    torso,
+    // provides sight
+    sensor,
+    // you eat and scream with this
+    mouth,
+    // may manipulate objects to some degree, is a main part
+    arm,
+    // manipulates objects. usually is not a main part.
+    hand,
+    // provides motive power
+    leg,
+    // helps with balance. usually is not a main part
+    foot,
+    // may reduce fall damage
+    wing,
+    // may provide balance or manipulation
+    tail,
+    // more of a general purpose limb, such as horns.
+    other,
+    num_types
+};
+
+template<>
+struct enum_traits<bp_type> {
+    static constexpr bp_type last = bp_type::num_types;
+};
+
+enum class surroundings_menu_tab_enum : int {
+    items = 0,
+    monsters,
+    terfurn,
+    num_tabs
+};
+
+template<>
+struct enum_traits<surroundings_menu_tab_enum> {
+    static constexpr surroundings_menu_tab_enum last = surroundings_menu_tab_enum::num_tabs;
+};
+
+// remaining capacity return value, see item::get_remaining_capacity_for_liquid()
+enum class rem_cap_return {
+    SUCCESS,
+    NO_SPACE,
+    NO_SPACE_IN_PARENT,
+    BUCKET_FAIL, // when item is bucket, and is not on ground/held
+    ANOTHER_LIQUID_INSIDE,
+    LAST
+};
 
 #endif // CATA_SRC_ENUMS_H

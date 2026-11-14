@@ -7,6 +7,7 @@
 #include <cstddef>
 #include <functional>
 #include <string>
+#include <string_view>
 #include <type_traits>
 #include <utility>
 
@@ -14,15 +15,15 @@
 #include "debug.h"
 #include "enum_conversions.h"
 #include "hash_utils.h"
-#include "pldata.h"
 #include "point.h"
-#include "type_id.h"
+#include "to_string_id.h"
+#include "type_id.h"  // IWYU pragma: keep
 
-class JsonIn;
+class cata_variant; // IWYU pragma: keep
 class JsonOut;
-template <typename E> struct enum_traits;
-
+class JsonValue;
 enum class mutagen_technique : int;
+template <typename E> struct enum_traits;
 
 namespace debug_menu
 {
@@ -35,34 +36,54 @@ enum class debug_menu_index : int;
 enum class cata_variant_type : int {
     void_, // Special type for empty variants
     achievement_id,
-    add_type,
+    activity_id,
+    addiction_id,
     bionic_id,
     body_part,
     bool_,
     character_id,
     chrono_seconds,
     debug_menu_index,
+    dimension_id,
     efftype_id,
+    faction_id,
+    field_type_id,
+    field_type_str_id,
+    furn_id,
+    furn_str_id,
+    flag_id,
     int_,
+    item_group_id,
     itype_id,
     matype_id,
     mtype_id,
+    mongroup_id,
     move_mode_id,
     mutagen_technique,
     mutation_category_id,
+    nested_mapgen_id,
+    npc_template_id,
     oter_id,
     oter_type_str_id,
+    overmap_special_id,
+    palette_id,
     point,
     profession_id,
+    proficiency_id,
     skill_id,
     species_id,
     spell_id,
     string,
     ter_id,
+    ter_furn_transform_id,
     ter_str_id,
     trait_id,
+    trap_id,
     trap_str_id,
     tripoint,
+    vgroup_id,
+    widget_id,
+    zone_type_id,
     num_types, // last
 };
 
@@ -90,7 +111,7 @@ constexpr cata_variant_type type_for_impl( std::index_sequence<I...> )
 {
     constexpr size_t num_types = static_cast<size_t>( cata_variant_type::num_types );
     constexpr std::array<bool, num_types> matches = {{
-            std::is_same<T, typename convert<static_cast<cata_variant_type>( I )>::type>::value...
+            std::is_same_v<T, typename convert<static_cast<cata_variant_type>( I )>::type>...
         }
     };
     for( size_t i = 0; i < num_types; ++i ) {
@@ -107,13 +128,16 @@ constexpr cata_variant_type type_for_impl( std::index_sequence<I...> )
 template<typename T>
 struct convert_string {
     using type = T;
-    static_assert( std::is_same<T, std::string>::value,
+    static_assert( std::is_same_v<T, std::string>,
                    "Intended for use only with string typedefs" );
     static std::string to_string( const T &v ) {
         return v;
     }
     static T from_string( const std::string &v ) {
         return v;
+    }
+    static bool is_valid( const std::string_view ) {
+        return true;
     }
 };
 
@@ -128,6 +152,9 @@ struct convert_string_id {
     static T from_string( const std::string &v ) {
         return T( v );
     }
+    static bool is_valid( const std::string &v ) {
+        return from_string( v ).is_valid();
+    }
 };
 
 // Inherit from this struct to easily implement convert specializations for any
@@ -140,6 +167,9 @@ struct convert_int_id {
     }
     static T from_string( const std::string &v ) {
         return T( v );
+    }
+    static bool is_valid( const std::string &v ) {
+        return to_string_id_t<T>( v ).is_valid();
     }
 };
 
@@ -154,23 +184,32 @@ struct convert_enum {
     static T from_string( const std::string &v ) {
         return io::string_to_enum<T>( v );
     }
+    static bool is_valid( const std::string &v ) {
+        return io::enum_is_valid<T>( v );
+    }
 };
 
 // These are the specializations of convert for each value type.
-static_assert( static_cast<int>( cata_variant_type::num_types ) == 30,
+static_assert( static_cast<int>( cata_variant_type::num_types ) == 50,
                "This assert is a reminder to add conversion support for any new types to the "
                "below specializations" );
 
 template<>
 struct convert<cata_variant_type::void_> {
     using type = void;
+    static bool is_valid( const std::string_view s ) {
+        return s.empty();
+    }
 };
 
 template<>
 struct convert<cata_variant_type::achievement_id> : convert_string_id<achievement_id> {};
 
 template<>
-struct convert<cata_variant_type::add_type> : convert_enum<add_type> {};
+struct convert<cata_variant_type::activity_id> : convert_string_id<activity_id> {};
+
+template<>
+struct convert<cata_variant_type::addiction_id> : convert_string_id<addiction_id> {};
 
 template<>
 struct convert<cata_variant_type::bionic_id> : convert_string_id<bionic_id> {};
@@ -187,6 +226,11 @@ struct convert<cata_variant_type::bool_> {
     static bool from_string( const std::string &v ) {
         return std::stoi( v );
     }
+    static bool is_valid( const std::string &v ) {
+        // TODO: check for int-ness
+        int i = std::stoi( v );
+        return i >= 0 && i <= 1;
+    }
 };
 
 template<>
@@ -198,16 +242,24 @@ struct convert<cata_variant_type::character_id> {
     static character_id from_string( const std::string &v ) {
         return character_id( std::stoi( v ) );
     }
+    static bool is_valid( const std::string_view ) {
+        // TODO: check for int-ness
+        return true;
+    }
 };
 
 template<>
 struct convert<cata_variant_type::chrono_seconds> {
     using type = std::chrono::seconds;
-    static std::string to_string( const std::chrono::seconds v ) {
+    static std::string to_string( const std::chrono::seconds &v ) {
         return std::to_string( v.count() );
     }
     static std::chrono::seconds from_string( const std::string &v ) {
         return std::chrono::seconds( std::stoll( v ) );
+    }
+    static bool is_valid( const std::string_view ) {
+        // TODO: check for int-ness
+        return true;
     }
 };
 
@@ -215,10 +267,31 @@ template<>
 struct convert<cata_variant_type::debug_menu_index> : convert_enum<debug_menu::debug_menu_index> {};
 
 template<>
+struct convert<cata_variant_type::dimension_id> : convert_string_id<dimension_id> {};
+
+template<>
 struct convert<cata_variant_type::move_mode_id> : convert_string_id<move_mode_id> {};
 
 template<>
 struct convert<cata_variant_type::efftype_id> : convert_string_id<efftype_id> {};
+
+template<>
+struct convert<cata_variant_type::faction_id> : convert_string_id<faction_id> {};
+
+template<>
+struct convert<cata_variant_type::field_type_id> : convert_int_id<field_type_id> {};
+
+template<>
+struct convert<cata_variant_type::field_type_str_id> : convert_string_id<field_type_str_id> {};
+
+template<>
+struct convert<cata_variant_type::furn_id> : convert_int_id<furn_id> {};
+
+template<>
+struct convert<cata_variant_type::furn_str_id> : convert_string_id<furn_str_id> {};
+
+template<>
+struct convert<cata_variant_type::flag_id> : convert_string_id<flag_id> {};
 
 template<>
 struct convert<cata_variant_type::int_> {
@@ -229,7 +302,14 @@ struct convert<cata_variant_type::int_> {
     static int from_string( const std::string &v ) {
         return std::stoi( v );
     }
+    static bool is_valid( const std::string_view ) {
+        // TODO: check for int-ness
+        return true;
+    }
 };
+
+template<>
+struct convert<cata_variant_type::item_group_id> : convert_string_id<item_group_id> {};
 
 template<>
 struct convert<cata_variant_type::itype_id> : convert_string_id<itype_id> {};
@@ -241,16 +321,32 @@ template<>
 struct convert<cata_variant_type::mtype_id> : convert_string_id<mtype_id> {};
 
 template<>
+struct convert<cata_variant_type::mongroup_id> : convert_string_id<mongroup_id> {};
+
+template<>
 struct convert<cata_variant_type::mutagen_technique> : convert_enum<mutagen_technique> {};
 
 template<>
-struct convert<cata_variant_type::mutation_category_id> : convert_string<std::string> {};
+struct convert<cata_variant_type::mutation_category_id> :
+    convert_string_id<mutation_category_id> {};
+
+template<>
+struct convert<cata_variant_type::nested_mapgen_id> : convert_string_id<nested_mapgen_id> {};
+
+template<>
+struct convert<cata_variant_type::npc_template_id> : convert_string_id<npc_template_id> {};
 
 template<>
 struct convert<cata_variant_type::oter_id> : convert_int_id<oter_id> {};
 
 template<>
 struct convert<cata_variant_type::oter_type_str_id> : convert_string_id<oter_type_str_id> {};
+
+template<>
+struct convert<cata_variant_type::overmap_special_id> : convert_string_id<overmap_special_id> {};
+
+template<>
+struct convert<cata_variant_type::palette_id> : convert_string_id<palette_id> {};
 
 template<>
 struct convert<cata_variant_type::point> {
@@ -261,10 +357,17 @@ struct convert<cata_variant_type::point> {
     static point from_string( const std::string &v ) {
         return point::from_string( v );
     }
+    static bool is_valid( const std::string_view ) {
+        // TODO: check for point-ness
+        return true;
+    }
 };
 
 template<>
 struct convert<cata_variant_type::profession_id> : convert_string_id<profession_id> {};
+
+template<>
+struct convert<cata_variant_type::proficiency_id> : convert_string_id<proficiency_id> {};
 
 template<>
 struct convert<cata_variant_type::skill_id> : convert_string_id<skill_id> {};
@@ -282,10 +385,17 @@ template<>
 struct convert<cata_variant_type::ter_id> : convert_int_id<ter_id> {};
 
 template<>
+struct convert<cata_variant_type::ter_furn_transform_id> :
+    convert_string_id<ter_furn_transform_id> {};
+
+template<>
 struct convert<cata_variant_type::ter_str_id> : convert_string_id<ter_str_id> {};
 
 template<>
 struct convert<cata_variant_type::trait_id> : convert_string_id<trait_id> {};
+
+template<>
+struct convert<cata_variant_type::trap_id> : convert_int_id<trap_id> {};
 
 template<>
 struct convert<cata_variant_type::trap_str_id> : convert_string_id<trap_str_id> {};
@@ -299,7 +409,20 @@ struct convert<cata_variant_type::tripoint> {
     static tripoint from_string( const std::string &v ) {
         return tripoint::from_string( v );
     }
+    static bool is_valid( const std::string_view ) {
+        // TODO: check for tripoint-ness
+        return true;
+    }
 };
+
+template<>
+struct convert<cata_variant_type::vgroup_id> : convert_string_id<vgroup_id> {};
+
+template<>
+struct convert<cata_variant_type::widget_id> : convert_string_id<widget_id> {};
+
+template<>
+struct convert<cata_variant_type::zone_type_id> : convert_string_id<zone_type_id> {};
 
 } // namespace cata_variant_detail
 
@@ -372,12 +495,14 @@ class cata_variant
             return value_;
         }
 
+        bool is_valid() const;
+
         std::pair<cata_variant_type, std::string> as_pair() const {
             return std::make_pair( type_, value_ );
         }
 
         void serialize( JsonOut & ) const;
-        void deserialize( JsonIn & );
+        void deserialize( const JsonValue &jsin );
 
 #define CATA_VARIANT_OPERATOR(op) \
     friend bool operator op( const cata_variant &l, const cata_variant &r ) { \

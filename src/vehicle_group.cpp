@@ -3,22 +3,26 @@
 #include <cstddef>
 #include <functional>
 #include <memory>
+#include <string>
 #include <utility>
 
+#include "coordinates.h"
 #include "debug.h"
-#include "json.h"
+#include "enums.h"
+#include "flexbuffer_json.h"
 #include "map.h"
 #include "memory_fast.h"
 #include "point.h"
-#include "translations.h"
-#include "vehicle.h"
+#include "units.h"
 #include "vpart_position.h"
 
 using vplacement_id = string_id<VehiclePlacement>;
 
+static const vgroup_id VehicleGroup_parkinglot( "parkinglot" );
+
 std::unordered_map<vgroup_id, VehicleGroup> vgroups;
-std::unordered_map<vplacement_id, VehiclePlacement> vplacements;
-std::unordered_map<vspawn_id, VehicleSpawn> vspawns;
+static std::unordered_map<vplacement_id, VehiclePlacement> vplacements;
+static std::unordered_map<vspawn_id, VehicleSpawn> vspawns;
 
 /** @relates string_id */
 template<>
@@ -33,9 +37,9 @@ const VehicleGroup &string_id<VehicleGroup>::obj() const
     return iter->second;
 }
 
-point VehicleLocation::pick_point() const
+point_bub_ms VehicleLocation::pick_point() const
 {
-    return point( x.get(), y.get() );
+    return point_bub_ms( x.get(), y.get() );
 }
 
 /** @relates string_id */
@@ -63,6 +67,16 @@ bool string_id<VehiclePlacement>::is_valid() const
     return vplacements.count( *this ) > 0;
 }
 
+std::vector<vproto_id> VehicleGroup::all_possible_results() const
+{
+    std::vector<vproto_id> result;
+    result.reserve( vehicles.size() );
+    for( const std::pair<vproto_id, int> &wo : vehicles ) {
+        result.push_back( wo.first );
+    }
+    return result;
+}
+
 void VehicleGroup::load( const JsonObject &jo )
 {
     VehicleGroup &group = vgroups[vgroup_id( jo.get_string( "id" ) )];
@@ -77,14 +91,14 @@ void VehicleGroup::reset()
     vgroups.clear();
 }
 
-VehicleFacings::VehicleFacings( const JsonObject &jo, const std::string &key )
+VehicleFacings::VehicleFacings( const JsonObject &jo, std::string_view key )
 {
     if( jo.has_array( key ) ) {
         for( const int i : jo.get_array( key ) ) {
-            values.push_back( i );
+            values.push_back( units::from_degrees( i ) );
         }
     } else {
-        values.push_back( jo.get_int( key ) );
+        values.push_back( units::from_degrees( jo.get_int( key ) ) );
     }
 }
 
@@ -128,7 +142,7 @@ VehicleFunction_json::VehicleFunction_json( const JsonObject &jo )
 
 void VehicleFunction_json::apply( map &m, const std::string &terrain_name ) const
 {
-    for( auto i = number.get(); i > 0; i-- ) {
+    for( int i = number.get(); i > 0; i-- ) {
         if( !location ) {
             const size_t replace = placement.find( "%t" );
             const VehicleLocation *loc = vplacement_id( replace != std::string::npos ?
@@ -140,9 +154,13 @@ void VehicleFunction_json::apply( map &m, const std::string &terrain_name ) cons
                 debugmsg( "vehiclefunction_json: unable to get location to place vehicle." );
                 return;
             }
-            m.add_vehicle( vehicle, loc->pick_point(), loc->pick_facing(), fuel, status );
+            const tripoint_bub_ms pos{ loc->pick_point(), m.get_abs_sub().z() };
+            m.add_vehicle( vehicle->pick(), pos, loc->pick_facing(), fuel,
+                           static_cast<veh_spawn_status>( status ) );
         } else {
-            m.add_vehicle( vehicle, location->pick_point(), location->pick_facing(), fuel, status );
+            const tripoint_bub_ms pos{ location->pick_point(), m.get_abs_sub().z()};
+            m.add_vehicle( vehicle->pick(), pos, location->pick_facing(), fuel,
+                           static_cast<veh_spawn_status>( status ) );
         }
     }
 }
@@ -174,7 +192,7 @@ void VehicleSpawn::load( const JsonObject &jo )
             spawn.add( type.get_float( "weight" ), make_shared_fast<VehicleFunction_json>( vjo ) );
         } else if( type.has_string( "vehicle_function" ) ) {
             if( builtin_functions.count( type.get_string( "vehicle_function" ) ) == 0 ) {
-                type.throw_error( "load_vehicle_spawn: unable to find builtin function", "vehicle_function" );
+                type.throw_error_at( "vehicle_function", "load_vehicle_spawn: unable to find builtin function" );
             }
 
             spawn.add( type.get_float( "weight" ), make_shared_fast<VehicleFunction_builtin>
@@ -208,83 +226,26 @@ void VehicleSpawn::apply( const vspawn_id &id, map &m, const std::string &terrai
 namespace VehicleSpawnFunction
 {
 
-static void builtin_no_vehicles( map &, const std::string & )
+static void builtin_no_vehicles( map &, std::string_view )
 {}
 
-static void builtin_jackknifed_semi( map &m, const std::string &terrainid )
-{
-    const VehicleLocation *loc = vplacement_id( terrainid + "_semi" ).obj().pick();
-    if( !loc ) {
-        debugmsg( "builtin_jackknifed_semi unable to get location to place vehicle.  placement %s_semi",
-                  terrainid );
-        return;
-    }
-
-    const int facing = loc->pick_facing();
-    const point semi_p = loc->pick_point();
-    point trailer_p;
-
-    if( facing == 0 ) {
-        trailer_p.x = semi_p.x + 4;
-        trailer_p.y = semi_p.y - 10;
-    } else if( facing == 90 ) {
-        trailer_p.x = semi_p.x + 12;
-        trailer_p.y = semi_p.y + 1;
-    } else if( facing == 180 ) {
-        trailer_p.x = semi_p.x - 4;
-        trailer_p.y = semi_p.y + 10;
-    } else {
-        trailer_p.x = semi_p.x - 12;
-        trailer_p.y = semi_p.y - 1;
-    }
-
-    m.add_vehicle( vgroup_id( "semi_truck" ), semi_p, ( facing + 135 ) % 360, -1, 1 );
-    m.add_vehicle( vgroup_id( "truck_trailer" ), trailer_p, ( facing + 90 ) % 360, -1, 1 );
-}
-
-static void builtin_pileup( map &m, const std::string &, const std::string &vg )
-{
-    vehicle *last_added_car = nullptr;
-    const int num_cars = rng( 5, 12 );
-
-    for( int i = 0; i < num_cars; i++ ) {
-        const VehicleLocation *loc = vplacement_id( "pileup" ).obj().pick();
-        if( !loc ) {
-            debugmsg( "builtin_pileup unable to get location to place vehicle." );
-            return;
-        }
-
-        last_added_car = m.add_vehicle( vgroup_id( vg ), loc->pick_point(),
-                                        loc->pick_facing(), -1, 1 );
-        if( last_added_car != nullptr ) {
-            last_added_car->name = _( "pile-up" );
-        } else {
-            break;
-        }
-    }
-}
-
-static void builtin_citypileup( map &m, const std::string &t )
-{
-    builtin_pileup( m, t, "city_pileup" );
-}
-
-static void builtin_policepileup( map &m, const std::string &t )
-{
-    builtin_pileup( m, t, "police_pileup" );
-}
-
-static void builtin_parkinglot( map &m, const std::string & )
+static void builtin_parkinglot( map &m, std::string_view )
 {
     for( int v = 0; v < rng( 1, 4 ); v++ ) {
-        tripoint pos_p;
-        pos_p.x = rng( 0, 1 ) * 15 + rng( 4, 5 );
-        pos_p.y = rng( 0, 4 ) * 4 + rng( 2, 4 );
-        pos_p.z = m.get_abs_sub().z;
+        tripoint_bub_ms pos_p;
+        pos_p.x() = rng( 0, 1 ) * 15 + rng( 4, 5 );
+        pos_p.y() = rng( 0, 4 ) * 4 + rng( 2, 4 );
+        pos_p.z() = m.get_abs_sub().z();
 
         if( !m.veh_at( pos_p ) ) {
-            m.add_vehicle( vgroup_id( "parkinglot" ), pos_p,
-                           ( one_in( 2 ) ? 0 : 180 ) + one_in( 10 ) * rng( 0, 179 ), -1, -1 );
+            units::angle facing;
+            if( one_in( 10 ) ) {
+                facing = random_direction();
+            } else {
+                facing = one_in( 2 ) ? 0_degrees : 180_degrees;
+            }
+            m.add_vehicle( VehicleGroup_parkinglot->pick(), pos_p, facing, -1,
+                           veh_spawn_status::DEFAULT_LIGHT_DMG );
         }
     }
 }
@@ -293,8 +254,5 @@ static void builtin_parkinglot( map &m, const std::string & )
 
 VehicleSpawn::FunctionMap VehicleSpawn::builtin_functions = {
     { "no_vehicles", VehicleSpawnFunction::builtin_no_vehicles },
-    { "jack-knifed_semi", VehicleSpawnFunction::builtin_jackknifed_semi },
-    { "vehicle_pileup", VehicleSpawnFunction::builtin_citypileup },
-    { "policecar_pileup", VehicleSpawnFunction::builtin_policepileup },
     { "parkinglot", VehicleSpawnFunction::builtin_parkinglot }
 };

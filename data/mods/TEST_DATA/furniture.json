@@ -1,0 +1,276 @@
+[
+  {
+    "type": "furniture",
+    "id": "test_f_boltcut1",
+    "name": "Boltcut Test Furniture 1",
+    "description": "Boltcut furniture with valid data.",
+    "symbol": "f",
+    "color": "blue",
+    "move_cost_mod": 1,
+    "required_str": 8,
+    "boltcut": { "duration": "5 seconds" }
+  },
+  {
+    "type": "furniture",
+    "id": "test_f_boltcut2",
+    "name": "Boltcut Test Furniture 2",
+    "description": "Boltcut furniture with valid data.",
+    "symbol": "f",
+    "color": "blue",
+    "move_cost_mod": 1,
+    "required_str": 8,
+    "boltcut": { "result": "test_f_boltcut1", "duration": "5 seconds" }
+  },
+  {
+    "type": "furniture",
+    "id": "test_f_boltcut3",
+    "name": "Boltcut Test Furniture 1",
+    "description": "Boltcut furniture with valid data.",
+    "symbol": "f",
+    "color": "blue",
+    "move_cost_mod": 1,
+    "required_str": 8,
+    "boltcut": { "duration": "80 seconds" }
+  },
+  {
+    "type": "furniture",
+    "id": "test_f_hacksaw1",
+    "name": "Hacksaw Test Furniture 1",
+    "description": "Hacksaw furniture with valid data.",
+    "symbol": "f",
+    "color": "blue",
+    "move_cost_mod": 1,
+    "required_str": 8,
+    "hacksaw": { "duration": "5 minutes" }
+  },
+  {
+    "type": "furniture",
+    "id": "test_f_hacksaw2",
+    "name": "Hacksaw Test Furniture 2",
+    "description": "Hacksaw furniture with valid data.",
+    "symbol": "f",
+    "color": "blue",
+    "move_cost_mod": 1,
+    "required_str": 8,
+    "hacksaw": { "result": "test_f_hacksaw1", "duration": "5 minutes" }
+  },
+  {
+    "type": "furniture",
+    "id": "test_f_hacksaw3",
+    "name": "Hacksaw Test Furniture 1",
+    "description": "Hacksaw furniture with valid data.",
+    "symbol": "f",
+    "color": "blue",
+    "move_cost_mod": 1,
+    "required_str": 8,
+    "hacksaw": { "duration": "80 minutes" }
+  },
+  {
+    "type": "furniture",
+    "id": "test_f_migration_new_id",
+    "name": "Furniture Test Migration",
+    "description": "Id to test migration from it's invalid counterparts test_t_migration_old_id and test_f_migration_old_id to.",
+    "symbol": "f",
+    "color": "blue",
+    "move_cost_mod": 1,
+    "required_str": 8
+  },
+  {
+    "type": "furniture",
+    "id": "test_f_oxytorch1",
+    "name": "Oxytorch Test Furniture 1",
+    "description": "Oxytorch furniture with valid data.",
+    "symbol": "f",
+    "color": "blue",
+    "move_cost_mod": 1,
+    "required_str": 8,
+    "oxytorch": { "duration": "5 seconds" }
+  },
+  {
+    "type": "furniture",
+    "id": "test_f_oxytorch2",
+    "name": "Oxytorch Test Furniture 2",
+    "description": "Oxytorch furniture with valid data.",
+    "symbol": "f",
+    "color": "blue",
+    "move_cost_mod": 1,
+    "required_str": 8,
+    "oxytorch": { "result": "test_f_oxytorch1", "duration": "5 seconds" }
+  },
+  {
+    "type": "furniture",
+    "id": "test_f_oxytorch3",
+    "name": "Oxytorch Test Furniture 1",
+    "description": "Oxytorch furniture with valid data.",
+    "symbol": "f",
+    "color": "blue",
+    "move_cost_mod": 1,
+    "required_str": 8,
+    "oxytorch": { "duration": "80 seconds" }
+  },
+  {
+    "type": "furniture",
+    "id": "test_f_prying1",
+    "name": "Prying Test Furniture 1",
+    "description": "Prying furniture with valid data.",
+    "symbol": "f",
+    "color": "blue",
+    "move_cost_mod": 1,
+    "required_str": 8,
+    "prying": { "duration": "17 seconds", "prying_data": { "prying_nails": true } }
+  },
+  {
+    "type": "furniture",
+    "id": "test_f_bash_nofield",
+    "name": "Bash nofield furniture",
+    "description": "Testing fields produced on bash",
+    "symbol": "f",
+    "color": "blue",
+    "bash": { "str_min": 4, "str_max": 100, "sound": "Tests testing!", "sound_fail": "Tests testing!" },
+    "move_cost_mod": 1,
+    "required_str": 8
+  },
+  {
+    "type": "furniture",
+    "id": "test_f_bash_hitfield",
+    "name": "Bash hit field furniture",
+    "description": "Testing fields produced on bash",
+    "symbol": "f",
+    "color": "blue",
+    "bash": {
+      "str_min": 4,
+      "str_max": 100,
+      "sound": "Tests testing!",
+      "sound_fail": "Tests testing!",
+      "hit_field": [ "fd_marker1", 2 ]
+    },
+    "move_cost_mod": 1,
+    "required_str": 8
+  },
+  {
+    "type": "furniture",
+    "id": "test_f_bash_destroyfield",
+    "name": "Bash destroy field furniture",
+    "description": "Testing fields produced on bash",
+    "symbol": "f",
+    "color": "blue",
+    "bash": {
+      "str_min": 4,
+      "str_max": 100,
+      "sound": "Tests testing!",
+      "sound_fail": "Tests testing!",
+      "destroyed_field": [ "fd_marker1", 1 ]
+    },
+    "move_cost_mod": 1,
+    "required_str": 8
+  },
+  {
+    "type": "furniture",
+    "id": "test_f_bash_bothfield",
+    "name": "Bash both field furniture",
+    "description": "Testing fields produced on bash",
+    "symbol": "f",
+    "color": "blue",
+    "bash": {
+      "str_min": 4,
+      "str_max": 100,
+      "sound": "Tests testing!",
+      "sound_fail": "Tests testing!",
+      "hit_field": [ "fd_marker2", 1 ],
+      "destroyed_field": [ "fd_marker1", 2 ]
+    },
+    "move_cost_mod": 1,
+    "required_str": 8
+  },
+  {
+    "type": "furniture",
+    "id": "test_f_bash_persist",
+    "name": "Bash persistence furniture",
+    "description": "Testing that bashing data does not persist when furniture changes",
+    "symbol": "f",
+    "color": "blue",
+    "bash": { "str_min": 4, "str_max": 100, "sound": "Tests testing!", "sound_fail": "Tests testing!" },
+    "move_cost_mod": 1,
+    "required_str": 8
+  },
+  {
+    "type": "furniture",
+    "id": "test_f_eoc",
+    "name": "EoC Test Furniture 1",
+    "description": "Prying furniture with valid data.",
+    "symbol": "f",
+    "color": "blue",
+    "move_cost_mod": 1,
+    "required_str": 8,
+    "examine_action": { "type": "effect_on_condition", "effect_on_conditions": [ "EOC_test_f_eoc" ] }
+  },
+  {
+    "type": "effect_on_condition",
+    "id": "EOC_test_f_eoc",
+    "effect": [
+      { "copy_var": { "context_val": "this" }, "target_var": { "global_val": "this" } },
+      { "copy_var": { "context_val": "pos" }, "target_var": { "global_val": "pos" } }
+    ]
+  },
+  {
+    "//": "Craft reservation fixture: a furniture provider that is also bashable, so it serves both the provider-tile lock tests and the NPC pathing tests.  crafting_pseudo_item is a furniture field, which is why no mutation fixture can supply an item this way.",
+    "type": "furniture",
+    "id": "test_f_reserve_qual",
+    "name": "Reservation Test Kiln",
+    "description": "Test furniture supplying a craftable quality through a pseudo item.",
+    "symbol": "f",
+    "color": "blue",
+    "move_cost_mod": -1,
+    "required_str": 12,
+    "crafting_pseudo_item": "test_reserve_pseudo_kiln",
+    "bash": {
+      "str_min": 4,
+      "str_max": 20,
+      "sound": "smash!",
+      "sound_fail": "thump.",
+      "items": [ { "item": "scrap", "count": [ 1, 3 ] } ]
+    }
+  },
+  {
+    "//": "Craft reservation fixture: a furniture charge source that can share a tile with a terrain provider, so the exclusion unit has to span both tile kinds.",
+    "type": "furniture",
+    "id": "test_f_reserve_charged",
+    "name": "Reservation Test Charged Kiln",
+    "description": "Test furniture supplying charges through a pseudo item.",
+    "symbol": "f",
+    "color": "blue",
+    "move_cost_mod": -1,
+    "required_str": 12,
+    "crafting_pseudo_item": "test_reserve_pseudo_kiln_charged"
+  },
+  {
+    "//": "Second provider tile carrying a DIFFERENT pseudo tool, so two provider-tile candidates are not interchangeable and the exclusion unit must cover the whole tile.",
+    "type": "furniture",
+    "id": "test_f_reserve_qual_b",
+    "name": "Reservation Test Kiln B",
+    "description": "Test furniture supplying a second craftable quality through a pseudo item.",
+    "symbol": "f",
+    "color": "blue",
+    "move_cost_mod": -1,
+    "required_str": 12,
+    "crafting_pseudo_item": "test_reserve_pseudo_kiln_b",
+    "bash": {
+      "str_min": 4,
+      "str_max": 20,
+      "sound": "smash!",
+      "sound_fail": "thump.",
+      "items": [ { "item": "scrap", "count": [ 1, 3 ] } ]
+    }
+  },
+  {
+    "type": "furniture",
+    "id": "test_f_translucent",
+    "name": "frosted glass partition",
+    "description": "Passes light but not sight, for vision tests.",
+    "symbol": "|",
+    "color": "light_cyan",
+    "move_cost_mod": -1,
+    "required_str": -1,
+    "flags": [ "TRANSPARENT", "TRANSLUCENT" ]
+  }
+]

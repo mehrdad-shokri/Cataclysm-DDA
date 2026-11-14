@@ -7,12 +7,14 @@
 #include <cmath>
 #include <functional>
 #include <string>
+#include <type_traits>
 
-#include "game_constants.h"
+#include "coords_fwd.h"
 #include "lightmap.h"
+#include "map_scale_constants.h"
+#include "mdarray.h"
 
-struct point;
-struct tripoint;
+struct fragment_cloud;
 
 // For light we store four values, depending on the direction that the light
 // comes from.  This allows us to determine whether the side of the wall the
@@ -25,6 +27,12 @@ enum class quadrant : int {
     SW,
     NW,
     default_ = NE
+};
+
+enum class vertical_direction {
+    UP,
+    DOWN,
+    BOTH
 };
 
 struct four_quadrants {
@@ -40,7 +48,10 @@ struct four_quadrants {
         return values[static_cast<int>( q )];
     }
     void fill( float v ) {
-        std::fill( values.begin(), values.end(), v );
+        values[0] = v;
+        values[1] = v;
+        values[2] = v;
+        values[3] = v;
     }
     float max() const {
         return *std::max_element( values.begin(), values.end() );
@@ -76,6 +87,7 @@ struct four_quadrants {
         return result;
     }
 };
+static_assert( std::is_trivially_copyable_v<four_quadrants> );
 
 // Hoisted to header and inlined so the test in tests/shadowcasting_test.cpp can use it.
 // Beer-Lambert law says attenuation is going to be equal to
@@ -108,13 +120,18 @@ template<typename T, typename Out, T( *calc )( const T &, const T &, const int &
          bool( *check )( const T &, const T & ),
          void( *update_output )( Out &, const T &, quadrant ),
          T( *accumulate )( const T &, const T &, const int & )>
-void castLightAll( Out( &output_cache )[MAPSIZE_X][MAPSIZE_Y],
-                   const T( &input_array )[MAPSIZE_X][MAPSIZE_Y],
-                   const point &offset, int offsetDistance = 0,
+void castLightAll( cata::mdarray<Out, point_bub_ms> &output_cache,
+                   const cata::mdarray<T, point_bub_ms> &input_array,
+                   const point_bub_ms &offset, int offsetDistance = 0,
                    T numerator = 1.0 );
 
 template<typename T>
-using array_of_grids_of = std::array<T( * )[MAPSIZE_X][MAPSIZE_Y], OVERMAP_LAYERS>;
+using array_of_grids_of =
+    std::conditional_t <
+    std::is_const_v<T>,
+    std::array<const cata::mdarray<std::remove_const_t<T>, point_bub_ms>*, OVERMAP_LAYERS>,
+    std::array<cata::mdarray<T, point_bub_ms>*, OVERMAP_LAYERS>
+    >;
 
 // TODO: Generalize the floor check, allow semi-transparent floors
 template< typename T, T( *calc )( const T &, const T &, const int & ),
@@ -124,6 +141,7 @@ void cast_zlight(
     const array_of_grids_of<T> &output_caches,
     const array_of_grids_of<const T> &input_arrays,
     const array_of_grids_of<const bool> &floor_caches,
-    const tripoint &origin, int offset_distance, T numerator );
+    const tripoint_bub_ms &origin, int offset_distance, T numerator,
+    vertical_direction dir = vertical_direction::BOTH );
 
 #endif // CATA_SRC_SHADOWCASTING_H

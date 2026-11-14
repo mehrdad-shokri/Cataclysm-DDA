@@ -2,12 +2,11 @@
   {
     "type": "mapgen",
     "om_terrain": [ [ "microlab_generic_edge_room_connector" ] ],
-    "method": "json",
     "object": {
       "fill_ter": "t_strconc_floor",
       "rows": [
         "|||||| PP  PP  PP ||||||",
-        " c|##| PP  PP  PP |##|  ",
+        " c|#|N PP  PP  PP |##|  ",
         " 6|||| PP |||| PP ||||F ",
         " F|XX= PP   h  PP =XX|F ",
         " F|XX= PP |dd| PP =XX|F ",
@@ -31,8 +30,7 @@
         " c|22||||||  ||||||c c  ",
         "     |FFFF|  |FFFF|     "
       ],
-      "palettes": [ "microlab" ],
-      "terrain": { "X": "t_region_shrub_decorative", "P": "t_carpet_concrete_red" }
+      "palettes": [ "microlab" ]
     }
   }
 ]

@@ -1,0 +1,7 @@
+[
+  {
+    "type": "profession_group",
+    "id": "adult_basic_background",
+    "professions": [ "mundane_survival", "bionic_interface" ]
+  }
+]

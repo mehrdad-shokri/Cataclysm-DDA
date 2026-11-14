@@ -2,13 +2,15 @@
 #ifndef CATA_SRC_CLOTHING_MOD_H
 #define CATA_SRC_CLOTHING_MOD_H
 
-#include <algorithm>
 #include <array>
 #include <cstddef>
 #include <string>
+#include <string_view>
+#include <type_traits>
+#include <utility>
 #include <vector>
 
-#include "string_id.h"
+#include "translation.h"
 #include "type_id.h"
 
 class JsonObject;
@@ -27,6 +29,11 @@ enum clothing_mod_type : int {
     num_clothing_mod_types
 };
 
+inline auto  format_as( clothing_mod_type cmt )
+{
+    return static_cast<std::underlying_type_t<clothing_mod_type>>( cmt );
+}
+
 template<>
 struct enum_traits<clothing_mod_type> {
     static constexpr clothing_mod_type last = clothing_mod_type::num_clothing_mod_types;
@@ -36,22 +43,24 @@ struct mod_value {
     clothing_mod_type type = clothing_mod_type::num_clothing_mod_types;
     float value = 0.0f;
     bool round_up = false;
-    bool thickness_propotion = false;
-    bool coverage_propotion = false;
+    bool thickness_proportion = false;
+    bool coverage_proportion = false;
 };
 
 struct clothing_mod {
-    void load( const JsonObject &jo, const std::string &src );
+    void load( const JsonObject &jo, std::string_view src );
+    static void finalize_all();
     float get_mod_val( const clothing_mod_type &type, const item &it ) const;
     bool has_mod_type( const clothing_mod_type &type ) const;
 
     clothing_mod_id id;
+    std::vector<std::pair<clothing_mod_id, mod_id>> src;
     bool was_loaded = false;
 
-    std::string flag;
+    flag_id flag;
     itype_id item_string;
-    std::string implement_prompt;
-    std::string destroy_prompt;
+    translation implement_prompt;
+    translation destroy_prompt;
     std::vector< mod_value > mod_values;
     bool restricted = false;
 

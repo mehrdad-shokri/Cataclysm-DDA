@@ -11,15 +11,17 @@ from io import StringIO
 
 
 SCRIPT_DIR = os.path.abspath(os.path.dirname(__file__))
-JSON_DIR = os.path.normpath(os.path.join(SCRIPT_DIR, "..", "..", "data", "json"))
+JSON_DIR = os.path.normpath(
+    os.path.join(SCRIPT_DIR, "..", "..", "data", "json"))
 JSON_FNMATCH = "*.json"
 
 
 def import_data(json_dir=JSON_DIR, json_fmatch=JSON_FNMATCH):
     """Use a UNIX like file match expression to weed out the JSON files.
 
-    returns tuple, first element containing json read, second element containing
-    list of any errors found. error list will be empty if no errors
+    returns tuple, first element containing json read, second element
+    containing list of any errors found. error list will be empty if
+    no errors
     """
     data = []
     errors = []
@@ -29,16 +31,22 @@ def import_data(json_dir=JSON_DIR, json_fmatch=JSON_FNMATCH):
         for f in d_descriptor[2]:
             if fnmatch(f, json_fmatch):
                 json_file = os.path.join(d, f)
-                with open(json_file, "r") as file:
+                with open(json_file, "r", encoding="utf-8") as file:
                     try:
-                        candidates = json.load(file, object_pairs_hook=OrderedDict)
+                        candidates = json.load(
+                            file, object_pairs_hook=OrderedDict)
                     except Exception as err:
-                        errors.append("Problem reading file %s, reason: %s" % (json_file, err))
-                    if type(candidates) != list:
-                        if type(candidates) == OrderedDict:
+                        errors.append(
+                            "Problem reading file {},".format(json_file) +
+                            " reason: {}".format(err))
+                    if type(candidates) is not list:
+                        if type(candidates) is OrderedDict:
                             data.append(candidates)
                         else:
-                            errors.append("Problem parsing data from file %s, reason: expected a list." % json_file)
+                            errors.append(
+                                "Problem parsing data from" +
+                                " file {},".format(json_file) +
+                                " reason: expected a list.")
                     else:
                         data += candidates
     return (data, errors)
@@ -48,13 +56,13 @@ def match_primitive_values(item_value, where_value):
     """Perform any odd logic on item matching.
     """
     # Matching interpolation for keyboard constrained input.
-    if type(item_value) == str:
+    if type(item_value) is str:
         # Direct match
         return bool(re.match(where_value, item_value))
-    elif type(item_value) == int or type(item_value) == float:
+    elif type(item_value) is int or type(item_value) is float:
         # match after string conversion
         return bool(re.match(where_value, str(item_value)))
-    elif type(item_value) == bool:
+    elif type(item_value) is bool:
         # help conversion to JSON booleans from the commandline
         return bool(re.match(where_value, str(item_value).lower()))
     else:
@@ -78,14 +86,14 @@ def matches_where(item, where_key, where_value):
     # So we have some value.
     item_value = item[where_key]
     # Matching interpolation for keyboard constrained input.
-    if type(item_value) == list:
+    if type(item_value) is list:
         # 1 level deep.
         for next_level in item_value:
             if match_primitive_values(next_level, where_value):
                 return True
         # else...
         return False
-    elif type(item_value) == dict:
+    elif type(item_value) is dict:
         # Match against the keys of the dictionary... I question my logic.
         # 1 level deep.
         for next_level in item_value:
@@ -126,7 +134,8 @@ class WhereAction(argparse.Action):
     """
 
     def where_test_factory(self, where_key, where_value):
-        """Wrap the where test we are using and return it as a callable function.
+        """Wrap the where test we are using and return it as a callable
+        function.
 
         item in the callback is assumed to be what we're testing against.
         """
@@ -137,21 +146,24 @@ class WhereAction(argparse.Action):
     def __init__(self, option_strings, dest, nargs=None, **kwargs):
         if not nargs:
             raise ValueError("nargs must be declared")
-        super(WhereAction, self).__init__(option_strings, dest, nargs=nargs, **kwargs)
+        super(WhereAction, self).__init__(
+            option_strings, dest, nargs=nargs, **kwargs)
 
     def __call__(self, parser, namespace, values, option_string=None):
         try:
             where_functions = []
             for w in values:
-                where_key, where_value = w.split("=")
-                where_functions.append(self.where_test_factory(where_key, where_value))
+                w_key, w_value = w.split("=")
+                where_functions.append(self.where_test_factory(w_key, w_value))
             setattr(namespace, self.dest, where_functions)
         except Exception:
-            raise ValueError("Where options are strict. Must be in the form of 'where_key=where_value'")
+            raise ValueError(
+                "Where options are strict. Must be in the form of"
+                " 'where_key=where_value'")
 
 
 def key_counter(data, where_fn_list):
-    """Count occurences of keys found in data {list of dicts}
+    """Count occurrences of keys found in data {list of dicts}
     that also match each where_fn_list {list of fns}.
 
     Returns a tuple of data.
@@ -167,17 +179,18 @@ def key_counter(data, where_fn_list):
 
             val = item[key]
             # If value is an object, tally key.subkey for all object subkeys
-            if type(val) == OrderedDict:
+            if type(val) is OrderedDict:
                 for subkey in val.keys():
                     if not subkey.startswith('//'):
                         stats[key + '.' + subkey] += 1
 
             # If value is a list of objects, tally key.subkey for each
-            elif type(val) == list and all(type(e) == OrderedDict for e in val):
-                for obj in val:
-                    for subkey in obj.keys():
-                        if not subkey.startswith('//'):
-                            stats[key + '.' + subkey] += 1
+            elif type(val) is list:
+                if all(type(e) is OrderedDict for e in val):
+                    for obj in val:
+                        for subkey in obj.keys():
+                            if not subkey.startswith('//'):
+                                stats[key + '.' + subkey] += 1
 
             # For anything else, it only counts as one
             else:
@@ -195,13 +208,13 @@ def item_value_counter(_value):
     if isinstance(_value, str):
         stats[_value] += 1
     # Cast numbers to strings
-    elif type(_value) == int or type(_value) == float:
+    elif type(_value) is int or type(_value) is float:
         stats[str(_value)] += 1
     # Pull all values from objects
-    elif type(_value) == OrderedDict:
+    elif type(_value) is OrderedDict:
         stats += list_value_counter(list(_value.values()))
     # Pull values from list of objects or strings
-    elif type(_value) == list:
+    elif type(_value) is list:
         stats += list_value_counter(_value)
     else:
         raise ValueError("Value '%s' has unknown type %s" %
@@ -254,14 +267,14 @@ def value_counter(data, search_key, where_fn_list):
 
         # If this value is a list of objects, pull parent_key.child_key
         # values from all of them to include in stats
-        if type(parent_val) == list and all(type(e) == OrderedDict
+        if type(parent_val) is list and all(type(e) is OrderedDict
                                             for e in parent_val):
             for od in parent_val:
                 if child_key in od:
                     stat_vals.append(od[child_key])
 
         # If this value is a single object, get value at parent_key.child_key
-        elif type(parent_val) == OrderedDict and child_key in parent_val:
+        elif type(parent_val) is OrderedDict and child_key in parent_val:
             stat_vals.append(parent_val[child_key])
 
         # Other kinds of data cannot be indexed by parent_key.child_key
@@ -293,7 +306,8 @@ def ui_counts_to_columns(counts):
     """Take a Counter instance and display in single fixed width key:value
     column.
     """
-    # Values in left column, counts in right, left column as wide as longest string length.
+    # Values in left column, counts in right, left
+    # column as wide as longest string length.
     key_vals = counts.most_common()
     key_field_len = len(max(list(counts.keys()), key=len)) + 1
     output_template = "%%-%ds: %%s" % key_field_len
@@ -348,10 +362,7 @@ class CDDAJSONWriter(object):
                 self.indent_multiplier -= 1
             self.buf.write("\n")
             self.indented_write("]")
-            if lol:
-                self.buf.write(",\n")
-            else:
-                self.buf.write("\n")
+            self.buf.write(",\n" if lol else "\n")
             self.indent_multiplier -= 1
         self.indented_write("]")
 
@@ -364,13 +375,12 @@ class CDDAJSONWriter(object):
 
         self.buf = StringIO()
         items = list(self.d.items())
-        global indent_multiplier
         self.indented_write("{\n")
         self.indent_multiplier += 1
         while items:
             k, v = items.pop(0)
             # Special cases first.
-            if (k == "tools" or k == "components") and type(v) == list:
+            if (k == "tools" or k == "components") and type(v) is list:
                 self.list_of_lists(k, v)
             else:
                 self.write_primitive_key_val(k, v)

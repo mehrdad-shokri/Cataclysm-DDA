@@ -1,14 +1,12 @@
-#include "catch/catch.hpp"
-
 #include <algorithm>
 #include <functional>
 #include <iterator>
-#include <type_traits>
 #include <utility>
 #include <vector>
 
-#include "flat_set.h"
 #include "assertion_helpers.h"
+#include "cata_catch.h"
+#include "flat_set.h"
 
 #if 0
 // Uncomment this to check container concepts if Boost is installed
@@ -112,6 +110,7 @@ TEST_CASE( "flat_set_comparison", "[flat_set]" )
     CHECK( int_set{ 6, 0 } < int_set{ 1 } );
 }
 
+// NOLINTNEXTLINE(misc-use-internal-linkage): anon-ns wrap makes friend-operator overloads look unused
 struct int_like {
     int i;
 #define INT_LIKE_OPERATOR( op ) \

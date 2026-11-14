@@ -2,16 +2,19 @@
 
 #include "sdl_utils.h"
 
+#include <algorithm>
 #include <array>
+#include <cmath>
 #include <utility>
 
 #include "color.h"
 #include "color_loader.h"
 #include "cursesport.h"
 #include "debug.h"
+#include "point.h"
 #include "sdltiles.h"
 
-color_pixel_function_map builtin_color_pixel_functions = {
+static color_pixel_function_map builtin_color_pixel_functions = {
     { "color_pixel_none", nullptr },
     { "color_pixel_darken", color_pixel_darken },
     { "color_pixel_sepia_light", color_pixel_sepia_light },
@@ -21,6 +24,7 @@ color_pixel_function_map builtin_color_pixel_functions = {
     { "color_pixel_grayscale", color_pixel_grayscale },
     { "color_pixel_nightvision", color_pixel_nightvision },
     { "color_pixel_overexposed", color_pixel_overexposed },
+    { "color_pixel_silhouette", color_pixel_silhouette },
 };
 
 color_pixel_function_pointer get_color_pixel_function( const std::string &name )
@@ -33,10 +37,122 @@ color_pixel_function_pointer get_color_pixel_function( const std::string &name )
     return iter->second;
 }
 
+SDL_Color adjust_color_brightness( const SDL_Color &color, int percent )
+{
+    if( percent <= 0 ) {
+        return { 0x00, 0x00, 0x00, color.a };
+    }
+
+    if( percent == 100 ) {
+        return color;
+    }
+
+    return SDL_Color{
+        static_cast<Uint8>( std::min( color.r *percent / 100, 0xFF ) ),
+        static_cast<Uint8>( std::min( color.g *percent / 100, 0xFF ) ),
+        static_cast<Uint8>( std::min( color.b *percent / 100, 0xFF ) ),
+        color.a
+    };
+}
+
+SDL_Color mix_colors( const SDL_Color &first, const SDL_Color &second, int second_percent )
+{
+    if( second_percent <= 0 ) {
+        return first;
+    }
+
+    if( second_percent >= 100 ) {
+        return second;
+    }
+
+    const int first_percent = 100 - second_percent;
+
+    return SDL_Color{
+        static_cast<Uint8>( std::min( ( first.r * first_percent + second.r * second_percent ) / 100, 0xFF ) ),
+        static_cast<Uint8>( std::min( ( first.g * first_percent + second.g * second_percent ) / 100, 0xFF ) ),
+        static_cast<Uint8>( std::min( ( first.b * first_percent + second.b * second_percent ) / 100, 0xFF ) ),
+        static_cast<Uint8>( std::min( ( first.a * first_percent + second.a * second_percent ) / 100, 0xFF ) )
+    };
+}
+
+inline SDL_Color color_pixel_grayscale( const SDL_Color &color )
+{
+    if( is_black( color ) ) {
+        return color;
+    }
+
+    const Uint8 av = average_pixel_color( color );
+    const Uint8 result = std::max( av * 5 >> 3, 0x01 );
+
+    return { result, result, result, color.a };
+}
+
+inline SDL_Color color_pixel_nightvision( const SDL_Color &color )
+{
+    const Uint8 av = average_pixel_color( color );
+    const Uint8 result = std::min( ( av * ( ( av * 3 >> 2 ) + 64 ) >> 8 ) + 16, 0xFF );
+
+    return {
+        static_cast<Uint8>( result >> 2 ),
+        static_cast<Uint8>( result ),
+        static_cast<Uint8>( result >> 3 ),
+        color.a
+    };
+}
+
+inline SDL_Color color_pixel_overexposed( const SDL_Color &color )
+{
+    const Uint8 av = average_pixel_color( color );
+    const Uint8 result = std::min( 64 + ( av * ( ( av >> 2 ) + 0xC0 ) >> 8 ), 0xFF );
+
+    return {
+        static_cast<Uint8>( result >> 2 ),
+        static_cast<Uint8>( result ),
+        static_cast<Uint8>( result >> 3 ),
+        color.a
+    };
+}
+
+inline SDL_Color color_pixel_darken( const SDL_Color &color )
+{
+    if( is_black( color ) ) {
+        return color;
+    }
+
+    // 85/256 ~ 1/3
+    return {
+        std::max<Uint8>( 85 * color.r >> 8, 0x01 ),
+        std::max<Uint8>( 85 * color.g >> 8, 0x01 ),
+        std::max<Uint8>( 85 * color.b >> 8, 0x01 ),
+        color.a
+    };
+
+}
+
+inline SDL_Color color_pixel_mixer( const SDL_Color &color, const float &gammav,
+                                    const SDL_Color &color_a, const SDL_Color &color_b )
+{
+    if( is_black( color ) ) {
+        return color;
+    }
+
+    /*
+     *  Objective is to provide a gradient between two color points
+     *  (color_a and color_b) based on the grayscale value.
+     */
+
+    const Uint8 av = average_pixel_color( color );
+    const float pv = av / 255.0f;
+    const Uint8 finalv =
+        std::min( static_cast<int>( std::round( std::pow( pv, gammav ) * 150 ) ), 100 );
+
+    return mix_colors( color_a, color_b, finalv );
+}
+
 SDL_Color curses_color_to_SDL( const nc_color &color )
 {
     const int pair_id = color.to_color_pair_index();
-    const auto pair = cata_cursesport::colorpairs[pair_id];
+    const cata_cursesport::pairs pair = cata_cursesport::colorpairs[pair_id];
 
     int palette_index = pair.FG != 0 ? pair.FG : pair.BG;
 

@@ -13,14 +13,18 @@ CATA_LIB=../$(BUILD_PREFIX)cataclysm.a
 # built with BUILD_PREFIX set, you must set it for this invocation as well.
 ODIR ?= obj
 
-LDFLAGS += -L.
+LDFLAGS += -lpthread -L.
+
+# Enabling benchmarks
+DEFINES += -DCATCH_CONFIG_ENABLE_BENCHMARKING
 
 # Allow use of any header files from cataclysm.
 # Catch sections throw unused variable warnings.
 # Add no-sign-compare to fix MXE issue when compiling
 # Catch also uses "#pragma gcc diagnostic", which is not recognized on some supported compilers.
 # Clang and mingw are warning about Catch macros around perfectly normal boolean operations.
-CXXFLAGS += -I../src -Wno-unused-variable -Wno-sign-compare -Wno-unknown-pragmas -Wno-parentheses -MMD -MP
+CPPFLAGS += -I. -I../src -isystem ../src/third-party
+CXXFLAGS += -Wno-unused-variable -Wno-sign-compare -Wno-unknown-pragmas -Wno-parentheses
 CXXFLAGS += -Wall -Wextra
 
 ifndef PCH
@@ -31,13 +35,26 @@ ifndef CLANG
   CLANG = 0
 endif
 
+# clang 22 bug results in non-trivially supressable error about counter with -Wc2y-extensions
+# see https://github.com/llvm/llvm-project/issues/189645
+# Root Makefile may set CLANG to the compiler name (e.g. "clang++-22") rather than "1",
+# so trigger on any clang and (when detectable) restrict to clang >= 22 to match CMake.
+ifneq ($(CLANG), 0)
+  CLANG_MAJOR := $(shell $(CXX) -dM -E -x c++ /dev/null 2>/dev/null | sed -n 's/^\#define __clang_major__ //p')
+  ifeq ($(CLANG_MAJOR),)
+    DEFINES += -DCATCH_CONFIG_NO_COUNTER
+  else ifeq ($(shell test $(CLANG_MAJOR) -ge 22 && echo yes),yes)
+    DEFINES += -DCATCH_CONFIG_NO_COUNTER
+  endif
+endif
+
 ifeq ($(PCH), 1)
 PCHFLAGS += -DCATA_CATCH_PCH
 PCH_H = pch/tests-pch.hpp
 ifeq ($(CLANG), 0)
-PCH_P = $(PCH_H).gch
+PCH_P = $(ODIR)/$(PCH_H).gch
 else
-PCH_P = $(PCH_H).pch
+PCH_P = $(ODIR)/$(PCH_H).pch
 CXXFLAGS += -Wno-unused-macros
 endif
 endif
@@ -51,27 +68,39 @@ endif
 tests: $(TEST_TARGET)
 
 $(TEST_TARGET): $(OBJS) $(CATA_LIB)
-	+$(CXX) $(W32FLAGS) -o $@ $(DEFINES) $(OBJS) $(CATA_LIB) $(CXXFLAGS) $(LDFLAGS)
+	+$(CXX) $(W32FLAGS) -o $@ $(DEFINES) $(OBJS) $(CATA_LIB) $(CPPFLAGS) $(CXXFLAGS) $(LDFLAGS)
 
 $(PCH_P): $(PCH_H)
-	-$(CXX) $(CPPFLAGS) $(DEFINES) $(subst -Werror,,$(CXXFLAGS)) -Wno-non-virtual-dtor -Wno-unused-macros -I. -c $(PCH_H) -o $(PCH_P)
+	-$(CXX) $(CPPFLAGS) $(DEFINES) $(CXXFLAGS) -MMD -MP -Wno-error -Wno-non-virtual-dtor -Wno-unused-macros -I. -c $(PCH_H) -o $(PCH_P)
 
-# Iterate over all the individual tests.
-check: $(TEST_TARGET)
-	cd .. && tests/$(TEST_TARGET) --min-duration 0.2 --rng-seed time
+TEST_BATCHES = "crafting_skill_gain" "[slow]\ ~crafting_skill_gain" "~[slow]\ ~[.]"
+
+$(TEST_BATCHES): $(TEST_TARGET)
+	cd .. && tests/$(TEST_TARGET) --min-duration 0.2 --rng-seed time --order lex --user-dir test_user_dir_$$$$ $@
+
+check: $(TEST_TARGET) $(TEST_BATCHES)
+
+check-single: $(TEST_TARGET)
+	cd .. && tests/$(TEST_TARGET) --min-duration 0.2 --rng-seed time --order lex
 
 clean:
 	rm -rf *obj *objwin
 	rm -f *cata_test
-	rm -f pch/*pch.hpp.{gch,pch,d}
 
 #Unconditionally create object directory on invocation.
-$(shell mkdir -p $(ODIR))
+$(shell mkdir -p $(ODIR) $(dir $(PCH_P)))
 
+# Adding ../tests/ so that the directory appears in __FILE__ for log messages
 $(ODIR)/%.o: %.cpp $(PCH_P)
-	$(CXX) $(CPPFLAGS) $(DEFINES) $(CXXFLAGS) $(subst main-pch,tests-pch,$(PCHFLAGS)) -c $< -o $@
+	$(CXX) $(CPPFLAGS) $(DEFINES) $(CXXFLAGS) -MMD -MP $(subst main-pch,tests-pch,$(PCHFLAGS)) -c ../tests/$< -o $@
 
-.PHONY: clean check tests precompile_header
+$(ODIR)/%.inc: %.cpp
+	$(CXX) $(CPPFLAGS) $(DEFINES) $(CXXFLAGS) -H -E $< -o /dev/null 2> $@
+
+.PHONY: includes
+includes: $(OBJS:.o=.inc)
+
+.PHONY: clean check check-single tests precompile_header
 
 .SECONDARY: $(OBJS)
 

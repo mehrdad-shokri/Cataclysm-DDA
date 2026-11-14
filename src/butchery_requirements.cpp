@@ -1,10 +1,18 @@
 #include "butchery_requirements.h"
 
-#include "activity_handlers.h"
+#include <cstddef>
+#include <functional>
+#include <optional>
+#include <string>
+
+#include "butchery.h"
+#include "cata_utility.h"
 #include "creature.h"
 #include "debug.h"
+#include "enum_conversions.h"
+#include "flexbuffer_json.h"
 #include "generic_factory.h"
-#include "inventory.h"
+#include "item.h"
 #include "requirements.h"
 
 namespace
@@ -29,12 +37,17 @@ void butchery_requirements::load_butchery_req( const JsonObject &jo, const std::
     butchery_req_factory.load( jo, src );
 }
 
+void butchery_requirements::finalize_all()
+{
+    butchery_req_factory.finalize();
+}
+
 const std::vector<butchery_requirements> &butchery_requirements::get_all()
 {
     return butchery_req_factory.get_all();
 }
 
-void butchery_requirements::reset_all()
+void butchery_requirements::reset()
 {
     butchery_req_factory.reset();
 }
@@ -44,12 +57,14 @@ bool butchery_requirements::is_valid() const
     return butchery_req_factory.is_valid( this->id );
 }
 
-void butchery_requirements::load( const JsonObject &jo, const std::string & )
+void butchery_requirements::load( const JsonObject &jo, std::string_view )
 {
-    mandatory( jo, was_loaded, "id", id );
-
-    for( const JsonMember &member : jo.get_object( "requirements" ) ) {
-        float modifier = std::stof( member.name() );
+    for( const JsonMember member : jo.get_object( "requirements" ) ) {
+        std::optional<double> mod_val = svtod( member.name() );
+        if( !mod_val.has_value() ) {
+            jo.throw_error( "Invalid key for requirements, cannot convert to float" );
+        }
+        float modifier = mod_val.value();
         requirements.emplace( modifier, std::map<creature_size, std::map<butcher_type, requirement_id>> {} );
 
         int critter_size = 1;
@@ -59,7 +74,6 @@ void butchery_requirements::load( const JsonObject &jo, const std::string & )
                           id.c_str(), creature_size::num_sizes - 1 );
                 break;
             }
-            std::map<butcher_type, requirement_id> temp;
             requirements[modifier].emplace( static_cast<creature_size>( critter_size ),
                                             std::map<butcher_type, requirement_id> {} );
 
@@ -79,7 +93,7 @@ void butchery_requirements::check_consistency()
 {
     for( const butchery_requirements &req : get_all() ) {
         for( const auto &size_req : req.requirements ) {
-            if( size_req.second.size() != creature_size::num_sizes - 1 ) {
+            if( size_req.second.size() != static_cast<size_t>( creature_size::num_sizes - 1 ) ) {
                 debugmsg( "ERROR: %s needs exactly %d entries to cover all creature sizes",
                           req.id.c_str(), static_cast<int>( creature_size::num_sizes ) - 1 );
             }
@@ -94,15 +108,17 @@ void butchery_requirements::check_consistency()
 }
 
 std::pair<float, requirement_id> butchery_requirements::get_fastest_requirements(
-    const inventory &crafting_inv, creature_size size, butcher_type butcher ) const
+    const Character *actor, const temp_crafting_inventory &crafting_inv, creature_size size,
+    butcher_type butcher ) const
 {
-    for( auto riter = requirements.rbegin(); riter != requirements.rend(); ++riter ) {
-        if( riter->second.at( size ).at( butcher )->can_make_with_inventory( crafting_inv,
+    for( const std::pair<const float, std::map<creature_size, std::map<butcher_type, requirement_id>>>
+         &riter : requirements ) {
+        if( riter.second.at( size ).at( butcher )->can_make_with_inventory( actor, crafting_inv,
                 is_crafting_component ) ) {
-            return std::make_pair( riter->first, riter->second.at( size ).at( butcher ) );
+            return std::make_pair( riter.first, riter.second.at( size ).at( butcher ) );
         }
     }
     // we didn't find anything we could "craft", so return the requirement that's the fastest
-    const auto first = requirements.begin();
+    const auto first = requirements.rbegin();
     return std::make_pair( first->first, first->second.at( size ).at( butcher ) );
 }

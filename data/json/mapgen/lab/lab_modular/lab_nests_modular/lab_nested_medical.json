@@ -1,0 +1,346 @@
+[
+  {
+    "type": "mapgen",
+    "//": "A nested map for a 9x9 medical room, includes door and south wall.",
+    "nested_mapgen_id": "lab_medical_9x9_S",
+    "object": {
+      "mapgensize": [ 9, 9 ],
+      "rows": [
+        "......|SJ",
+        "......⁸..",
+        "......|.9",
+        "...ë..|⁸|",
+        "......|.L",
+        "......|.L",
+        "|]⁸⁸]||+|",
+        ".........",
+        "...ë....."
+      ],
+      "palettes": [ "lab_common_palette", "lab_medical_palette" ],
+      "place_nested": [ { "chunks": [ [ "lab_medical_6x6_open", 100 ] ], "x": 0, "y": 0 } ],
+      "flags": [ "ALLOW_TERRAIN_UNDER_FURNITURE" ]
+    }
+  },
+  {
+    "type": "mapgen",
+    "//": "A nested map for a 9x9 medical room, includes door and south wall.",
+    "nested_mapgen_id": "lab_medical_9x9_S",
+    "object": {
+      "mapgensize": [ 9, 9 ],
+      "rows": [
+        "Y.....|JJ",
+        "...ë..⁸..",
+        "J..8.A]r.",
+        "V..b..]ɱh",
+        "J.....]r.",
+        "......|..",
+        "||⁸⁸|||+|",
+        ".........",
+        "...ë....."
+      ],
+      "palettes": [ "lab_common_palette", "lab_medical_palette" ],
+      "flags": [ "ALLOW_TERRAIN_UNDER_FURNITURE" ]
+    }
+  },
+  {
+    "type": "mapgen",
+    "//": "A nested map for a 6x6 medical room.",
+    "nested_mapgen_id": "lab_medical_6x6_open",
+    "object": {
+      "mapgensize": [ 6, 6 ],
+      "rows": [
+        "......",
+        ".7A...",
+        ".oւ..Q",
+        "...ë.V",
+        "......",
+        "5...Y."
+      ],
+      "palettes": [ "lab_common_palette", "lab_medical_palette" ],
+      "vehicles": { "ւ": { "vehicle": "hospital_bed", "rotation": 270 } }
+    }
+  },
+  {
+    "type": "mapgen",
+    "//": "A nested map for a 6x6 medical room.",
+    "nested_mapgen_id": "lab_medical_6x6_open",
+    "object": {
+      "mapgensize": [ 6, 6 ],
+      "rows": [
+        "......",
+        ".|||..",
+        ".J|J.Q",
+        ".J|k.Q",
+        ".|||..",
+        "......"
+      ],
+      "palettes": [ "lab_common_palette", "lab_medical_palette" ]
+    }
+  },
+  {
+    "type": "mapgen",
+    "//": "A nested map for a 6x6 medical room.",
+    "nested_mapgen_id": "lab_medical_6x6_open",
+    "object": {
+      "mapgensize": [ 6, 6 ],
+      "rows": [
+        "QQ..qq",
+        "......",
+        ".J6e.a",
+        "..ëA..",
+        ".3JJY.",
+        ".A...."
+      ],
+      "palettes": [ "lab_common_palette", "lab_medical_palette" ],
+      "computers": { "6": {  } }
+    }
+  },
+  {
+    "type": "mapgen",
+    "//": "A nested map for a 9x9 medical room, includes door and north wall.",
+    "nested_mapgen_id": "lab_medical_9x9_N",
+    "object": {
+      "mapgensize": [ 9, 9 ],
+      "rows": [
+        "...ë.....",
+        ".........",
+        "|]⁸⁸]||+|",
+        "......|.L",
+        "......|.L",
+        "...ë..|+|",
+        "......|.9",
+        "......+..",
+        "......|SJ"
+      ],
+      "palettes": [ "lab_common_palette", "lab_medical_palette" ],
+      "place_nested": [ { "chunks": [ [ "lab_medical_6x6_open", 100 ] ], "x": 0, "y": 3 } ],
+      "items": { "L": [ { "item": "hazmat_masks", "chance": 70 }, { "item": "hazmat_suits", "chance": 70 } ] }
+    }
+  },
+  {
+    "type": "mapgen",
+    "//": "A nested map for a 9x9 medical room, includes door and north wall.",
+    "nested_mapgen_id": "lab_medical_9x9_N",
+    "object": {
+      "mapgensize": [ 9, 9 ],
+      "rows": [
+        "...ë.....",
+        ".........",
+        "||⁸⁸|||+|",
+        "....A.|.Y",
+        "J.....]r.",
+        "V..bë.]ɱh",
+        "J..8..]r.",
+        "Y.....⁸..",
+        "....o.|JJ"
+      ],
+      "palettes": [ "lab_common_palette", "lab_medical_palette" ]
+    }
+  },
+  {
+    "type": "mapgen",
+    "//": "A nested map for a 9x9 medical room, includes door and north wall.",
+    "nested_mapgen_id": "lab_medical_9x9_N",
+    "object": {
+      "mapgensize": [ 9, 9 ],
+      "rows": [
+        "....ë....",
+        ".ƃ.......",
+        "||||⁸||||",
+        ".h.....5Y",
+        "....ë....",
+        "ppppppppp",
+        "....p....",
+        ".ë..p..ë.",
+        "VГo.p.ГoV"
+      ],
+      "palettes": [ "lab_common_palette", "lab_medical_palette" ],
+      "vehicles": { "ƃ": { "vehicle": "wheelchair", "rotation": 90 }, "Г": { "vehicle": "hospital_bed", "rotation": 90 } }
+    }
+  },
+  {
+    "type": "mapgen",
+    "//": "A nested map for a 9x9 medical room, includes door and north wall.",
+    "nested_mapgen_id": "lab_medical_9x9_S",
+    "object": {
+      "mapgensize": [ 9, 9 ],
+      "rows": [
+        "Vւo.p.ւoV",
+        ".ë..p.ë.A",
+        "A...p....",
+        "ppppppppp",
+        "....ë....",
+        ".4.....E.",
+        "||||⁸||||",
+        ".........",
+        "....ë...."
+      ],
+      "palettes": [ "lab_common_palette", "lab_medical_palette" ],
+      "vehicles": { "ւ": { "vehicle": "hospital_bed", "rotation": 270 } },
+      "flags": [ "ALLOW_TERRAIN_UNDER_FURNITURE" ]
+    }
+  },
+  {
+    "type": "mapgen",
+    "//": "A nested map for a 9x9 medical room, includes door and north wall.",
+    "nested_mapgen_id": "lab_medical_9x9_N",
+    "object": {
+      "mapgensize": [ 9, 9 ],
+      "rows": [
+        "....ë....",
+        ".........",
+        "||+|||+||",
+        "...h|...Y",
+        ".ƨ..|J..ƃ",
+        ".ƨ.ƃ|Zhë.",
+        ".ƨë.|J.Ƨ.",
+        ".ƨ..|pppp",
+        "..AZ|h..."
+      ],
+      "palettes": [ "lab_common_palette", "lab_medical_palette" ],
+      "furniture": { "Ƨ": [ "f_treadmill", "f_treadmill_mechanical" ] },
+      "vehicles": { "ƃ": { "vehicle": "wheelchair", "rotation": 90 } }
+    }
+  },
+  {
+    "type": "mapgen",
+    "//": "A nested map for a 9x9 medical room, includes door and north wall.",
+    "nested_mapgen_id": "lab_medical_9x9_S",
+    "object": {
+      "mapgensize": [ 9, 9 ],
+      "rows": [
+        "A...|Z...",
+        "pppp|A.ƨ.",
+        ".ɔ.J|..ƨ.",
+        "ƃë.Z|.ëƨ.",
+        "...J|ƃ.ƨ.",
+        ".h.Y|y...",
+        "||+|||+||",
+        ".........",
+        "....ë...."
+      ],
+      "palettes": [ "lab_common_palette", "lab_medical_palette" ],
+      "vehicles": { "ƃ": { "vehicle": "wheelchair", "rotation": 90 } },
+      "flags": [ "ALLOW_TERRAIN_UNDER_FURNITURE" ]
+    }
+  },
+  {
+    "type": "mapgen",
+    "//": "A nested map for a 9x9 medical room, includes door and north wall.",
+    "nested_mapgen_id": "lab_medical_9x9_N",
+    "object": {
+      "mapgensize": [ 9, 9 ],
+      "rows": [
+        "....ë....",
+        ".........",
+        "||+|||+||",
+        "V..h|...Y",
+        "..o4|ÆJJ.",
+        ".ë.E|.Aë.",
+        "4..s|ÆJJ.",
+        "E...|A...",
+        "s.o.|JÆJJ"
+      ],
+      "palettes": [ "lab_common_palette", "lab_medical_palette" ],
+      "vehicles": { "ƃ": { "vehicle": "wheelchair", "rotation": 90 } }
+    }
+  },
+  {
+    "type": "mapgen",
+    "//": "A nested map for a 9x9 medical room, includes door and north wall.",
+    "nested_mapgen_id": "lab_medical_9x9_S",
+    "object": {
+      "mapgensize": [ 9, 9 ],
+      "rows": [
+        "A...|Z...",
+        "pppp|A.ƨ.",
+        ".Ƨ.J|..ƨ.",
+        "ƃ.ëZ|.ëƨ.",
+        "...J|ƃ.ƨ.",
+        ".h.Y|y...",
+        "||+|||+||",
+        ".........",
+        "....ë...."
+      ],
+      "palettes": [ "lab_common_palette", "lab_medical_palette" ],
+      "furniture": { "Ƨ": [ "f_treadmill", "f_treadmill_mechanical" ] },
+      "vehicles": { "ƃ": { "vehicle": "wheelchair", "rotation": 90 } },
+      "flags": [ "ALLOW_TERRAIN_UNDER_FURNITURE" ]
+    }
+  },
+  {
+    "type": "mapgen",
+    "//": "A nested map for a 9x9 medical room, includes door and south wall.",
+    "nested_mapgen_id": "lab_medical_9x9_S_autodoc",
+    "object": {
+      "mapgensize": [ 9, 9 ],
+      "rows": [
+        "J.o...|SJ",
+        "k.ɔЯ..⁸..",
+        "J..ë..|.9",
+        "XXXXXX|⁸|",
+        "rrrɱrr|.L",
+        "A..A..|.L",
+        "|]⁸⁸]||+|",
+        "j........",
+        "j...ë...."
+      ],
+      "palettes": [ "lab_common_palette", "lab_medical_palette" ],
+      "place_monster": [ { "monster": [ "mon_nursebot", "mon_nursebot_defective" ], "x": 4, "y": 2, "chance": 100 } ],
+      "items": { "L": [ { "item": "hazmat_masks", "chance": 70 }, { "item": "hazmat_suits", "chance": 70 } ] }
+    }
+  },
+  {
+    "type": "mapgen",
+    "//": "A nested map for a 9x9 medical room, includes door and north wall.",
+    "nested_mapgen_id": "lab_medical_9x9_N_autodoc",
+    "object": {
+      "mapgensize": [ 9, 9 ],
+      "rows": [
+        "j....ë...",
+        "j........",
+        "|]⁸⁸]||+|",
+        ".A..A.|.L",
+        "rrrɱrr|.L",
+        "XXXXXX|+|",
+        "J..ë..|.9",
+        "k.ɔЯ..+..",
+        "J....o|SJ"
+      ],
+      "palettes": [ "lab_common_palette", "lab_medical_palette" ],
+      "place_monster": [ { "monster": [ "mon_nursebot", "mon_nursebot_defective" ], "x": 4, "y": 6, "chance": 100 } ],
+      "items": { "L": [ { "item": "hazmat_masks", "chance": 70 }, { "item": "hazmat_suits", "chance": 70 } ] }
+    }
+  },
+  {
+    "type": "mapgen",
+    "//": "A custom nest for the mutant child boss",
+    "nested_mapgen_id": "lab_medical_boss_child",
+    "object": {
+      "mapgensize": [ 6, 6 ],
+      "rows": [
+        ".O...Q",
+        "...O.N",
+        ".....Q",
+        ".ff7..",
+        "...HH.",
+        ".O...."
+      ],
+      "palettes": [ "lab_common_palette", "lab_medical_palette" ],
+      "furniture": { "O": "f_floor_mattress" },
+      "place_items": [
+        { "item": "mutagen_or_serum_kit", "x": 5, "y": 0, "repeat": [ 3, 5 ], "chance": 100 },
+        { "item": "lab_mutagen_ingredients", "x": 5, "y": 0, "repeat": [ 1, 8 ], "chance": 90 },
+        { "item": "supplies_reagents_lab", "x": 5, "y": 2, "repeat": [ 1, 4 ], "chance": 90 },
+        { "item": "chem_lab", "x": 5, "y": 2, "repeat": [ 3, 5 ], "chance": 80 },
+        { "item": "dissection", "x": 1, "y": 3, "repeat": [ 1, 3 ], "chance": 50 },
+        { "item": "stash_food", "x": [ 0, 5 ], "y": [ 4, 5 ], "chance": 75, "repeat": [ 1, 2 ] }
+      ],
+      "place_monster": [
+        { "group": "GROUP_LAB_MUTANT_BOSS", "x": [ 0, 5 ], "y": [ 0, 5 ], "repeat": [ 6, 8 ] },
+        { "monster": "mon_mutant_alpha_boss", "x": 2, "y": 2 }
+      ],
+      "flags": [ "ALLOW_TERRAIN_UNDER_FURNITURE" ]
+    }
+  }
+]

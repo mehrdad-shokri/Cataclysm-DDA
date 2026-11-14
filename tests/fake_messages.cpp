@@ -3,13 +3,18 @@
 #include <utility>
 #include <vector>
 
-#include "enums.h"
+#include "calendar.h"
+#include "coords_fwd.h"
 #include "messages.h"
 
 class Creature;
 class JsonObject;
 class JsonOut;
-struct tripoint;
+namespace debugmode
+{
+enum debug_filter : int;
+}  // namespace debugmode
+struct game_message_params;
 
 namespace catacurses
 {
@@ -17,20 +22,38 @@ class window;
 }  // namespace catacurses
 
 /**
- * Stubs to turn all Messages calls into no-ops for unit testing.
+ * For unit testing we just store all messages so they can be dumped in the
+ * event of a test failure.
  */
+
+static std::vector<std::pair<std::string, std::string>> messages;
 
 std::vector<std::pair<std::string, std::string>> Messages::recent_messages( size_t )
 {
-    return std::vector<std::pair<std::string, std::string>>();
+    return messages;
 }
-void Messages::add_msg( std::string ) {}
-void Messages::add_msg( const game_message_params &, std::string ) {}
-void Messages::clear_messages() {}
+bool Messages::has_debug_filter( debugmode::debug_filter )
+{
+    return true;
+}
+void Messages::add_msg( std::string m )
+{
+    if( !m.empty() ) {
+        messages.emplace_back( to_string_time_of_day( calendar::turn ), std::move( m ) );
+    }
+}
+void Messages::add_msg( const game_message_params &, std::string m )
+{
+    add_msg( std::move( m ) );
+}
+void Messages::clear_messages()
+{
+    messages.clear();
+}
 void Messages::deactivate() {}
 size_t Messages::size()
 {
-    return 0;
+    return messages.size();
 }
 bool Messages::has_undisplayed_messages()
 {
@@ -40,10 +63,27 @@ void Messages::display_messages() {}
 void Messages::display_messages( const catacurses::window &, int, int, int, int ) {}
 void Messages::serialize( JsonOut & ) {}
 void Messages::deserialize( const JsonObject & ) {}
-
-void add_msg( std::string ) {}
-void add_msg( const game_message_params &, std::string ) {}
-void add_msg_if_player_sees( const tripoint &, std::string ) {}
-void add_msg_if_player_sees( const Creature &, std::string ) {}
-void add_msg_if_player_sees( const tripoint &, const game_message_params &, std::string ) {}
-void add_msg_if_player_sees( const Creature &, const game_message_params &, std::string ) {}
+void add_msg( std::string m )
+{
+    Messages::add_msg( std::move( m ) );
+}
+void add_msg( const game_message_params &, std::string m )
+{
+    Messages::add_msg( std::move( m ) );
+}
+void add_msg_if_player_sees( const tripoint_bub_ms &, std::string m )
+{
+    Messages::add_msg( std::move( m ) );
+}
+void add_msg_if_player_sees( const Creature &, std::string m )
+{
+    Messages::add_msg( std::move( m ) );
+}
+void add_msg_if_player_sees( const tripoint_bub_ms &, const game_message_params &, std::string m )
+{
+    Messages::add_msg( std::move( m ) );
+}
+void add_msg_if_player_sees( const Creature &, const game_message_params &, std::string m )
+{
+    Messages::add_msg( std::move( m ) );
+}

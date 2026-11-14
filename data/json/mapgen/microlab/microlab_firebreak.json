@@ -2,7 +2,6 @@
   {
     "type": "mapgen",
     "om_terrain": [ [ "microlab_generic_firebreak" ] ],
-    "method": "json",
     "weight": 500,
     "object": {
       "fill_ter": "t_strconc_floor",
@@ -10,9 +9,9 @@
         "||||||            ||||||",
         "|####|            |####|",
         "|####|            |####|",
-        "|####|            |####|",
-        "|####|            |####|",
-        "|#||||            ||||#|",
+        "|###||            |####|",
+        "|###|N            |####|",
+        "|#||||§          §||||#|",
         "|#|XX=            =XX|#|",
         "|#|XX=            =XX|#|",
         "|#|XX=dddd    dddd=XX|#|",
@@ -28,12 +27,11 @@
         "|#|XX=ddd     dddd=XX|#|",
         "|#|XX=            =XX|#|",
         "|#|XX=            =XX|#|",
-        "|#||||            ||||#|",
-        "|####| PP  PP  PP |####|",
+        "|#||||§          §||||#|",
+        "|###|N PP  PP  PP |####|",
         "|||||| PP  PP  PP ||||||"
       ],
       "palettes": [ "microlab" ],
-      "terrain": { "X": "t_region_shrub_decorative", "P": "t_carpet_concrete_red" },
       "computers": {
         "6": {
           "name": "Security Terminal",
@@ -41,20 +39,20 @@
           "options": [ { "name": "UNLOCK SECURITY DOORS", "action": "unlock" } ],
           "failures": [ { "action": "shutdown" }, { "action": "alarm" } ]
         }
-      }
+      },
+      "nested": { "§": { "chunks": [ "fire_extinguisher" ] } }
     }
   },
   {
     "type": "mapgen",
     "om_terrain": [ [ "microlab_generic_firebreak" ] ],
-    "method": "json",
     "weight": 500,
     "object": {
       "fill_ter": "t_strconc_floor",
       "rows": [
         "||||||            ||||||",
-        "|####|            |####|",
-        "|####|            |####|",
+        "|###|N            |####|",
+        "|###||§          §|####|",
         "|####|ddd      ddd|####|",
         "|####| hd      d  |####|",
         "|#||||  d PPPP d h|####|",
@@ -71,14 +69,13 @@
         "|####|-----55-6---|####|",
         "|####|XXX=      h |####|",
         "|####|==== YY dddd|####|",
-        "|####|            |####|",
-        "|####|            |####|",
-        "|####|            |####|",
+        "|###||            |####|",
+        "|###|N            |####|",
+        "|###||§          §|####|",
         "|####| PP  PP  PP |####|",
         "|||||| PP  PP  PP ||||||"
       ],
       "palettes": [ "microlab" ],
-      "terrain": { "X": "t_region_shrub_decorative", "P": "t_carpet_concrete_red" },
       "computers": {
         "6": {
           "name": "Security Terminal",
@@ -86,13 +83,13 @@
           "options": [ { "name": "UNLOCK SECURITY DOORS", "action": "unlock" } ],
           "failures": [ { "action": "shutdown" }, { "action": "alarm" } ]
         }
-      }
+      },
+      "nested": { "§": { "chunks": [ "fire_extinguisher" ] } }
     }
   },
   {
     "type": "mapgen",
     "om_terrain": [ [ "microlab_generic_firebreak" ] ],
-    "method": "json",
     "weight": 75,
     "object": {
       "fill_ter": "t_strconc_floor",
@@ -100,13 +97,13 @@
         "||||||            ||||||",
         "|####|            |####|",
         "|####|            |####|",
-        "|####|            |####|",
-        "|####|            |####|",
+        "|###||§          §|####|",
+        "|###|N            |####|",
         "|#||||    M       ||||#|",
-        "|#|XX=      ü     =XX|#|",
+        "|#|XX=            =XX|#|",
         "|#|XX=            =XX|#|",
         "|#|XX=dddd    dddd=XX|#|",
-        "|#||||  hd  M dh  ||||#|",
+        "|#||||  hd    dh  ||||#|",
         "|####|            |####|",
         "|####|---6-55-----|####|",
         "|#######---  -#########|",
@@ -118,14 +115,14 @@
         "|#|XX=ddd     dddd=XX|#|",
         "|#|XX=            =XX|#|",
         "|#|XX=            =XX|#|",
-        "|#||||            ||||#|",
-        "|####| PP  PP  PP |####|",
+        "|#||||§          §||||#|",
+        "|###|N PP  PP  PP |####|",
         "|||||| PP  PP  PP ||||||"
       ],
-      "set": [ { "point": "bash", "x": [ 6, 18 ], "y": [ 6, 18 ], "repeat": [ 30, 100 ] } ],
+      "set": [ { "point": "bash", "x": [ 5, 18 ], "y": [ 0, 11 ], "repeat": [ 30, 100 ] } ],
       "palettes": [ "microlab" ],
-      "terrain": { "X": "t_region_shrub_decorative", "P": "t_carpet_concrete_red" },
-      "monster": { "M": { "monster": "mon_mutant_experimental" }, "ü": { "monster": "mon_mutant_evolved" } },
+      "monster": { "M": { "monster": "mon_mutant_alpha", "chance": 50 } },
+      "place_monster": [ { "group": "GROUP_MUTANT_EVOLVED", "x": [ 6, 17 ], "y": [ 1, 10 ], "repeat": [ 2, 4 ] } ],
       "computers": {
         "6": {
           "name": "Security Terminal",
@@ -133,22 +130,22 @@
           "options": [ { "name": "UNLOCK SECURITY DOORS", "action": "unlock" } ],
           "failures": [ { "action": "shutdown" }, { "action": "alarm" } ]
         }
-      }
+      },
+      "nested": { "§": { "chunks": [ "fire_extinguisher" ] } }
     }
   },
   {
     "type": "mapgen",
     "om_terrain": [ [ "microlab_generic_firebreak" ] ],
-    "method": "json",
     "weight": 75,
     "object": {
       "fill_ter": "t_strconc_floor",
       "rows": [
         "||||||            ||||||",
         "|####|            |####|",
-        "|####|            |####|",
-        "|####|           ü|####|",
-        "|####|            |####|",
+        "|####|§          §|####|",
+        "|###||           ü|####|",
+        "|###|N            |####|",
         "|#||||            ||||#|",
         "|#|XX=            =XX|#|",
         "|#|XX=            =XX|#|",
@@ -165,13 +162,12 @@
         "|#|XX=ddd     dddd=XX|#|",
         "|#|XXü            =XX|#|",
         "|#|XX=            =üX|#|",
-        "|#||||            ||||#|",
-        "|####| PP  PP  PP |####|",
+        "|#||||§          §||||#|",
+        "|###|N PP  PP  PP |####|",
         "|||||| PP  PP  PP ||||||"
       ],
       "set": [ { "point": "bash", "x": [ 6, 18 ], "y": [ 6, 18 ], "repeat": [ 30, 100 ] } ],
       "palettes": [ "microlab" ],
-      "terrain": { "X": "t_region_shrub_decorative", "P": "t_carpet_concrete_red" },
       "monster": { "M": { "monster": "mon_hunting_horror" }, "ü": { "monster": "mon_breather_hub" } },
       "computers": {
         "6": {
@@ -180,7 +176,8 @@
           "options": [ { "name": "UNLOCK SECURITY DOORS", "action": "unlock" } ],
           "failures": [ { "action": "shutdown" }, { "action": "alarm" } ]
         }
-      }
+      },
+      "nested": { "§": { "chunks": [ "fire_extinguisher" ] } }
     }
   }
 ]

@@ -9,7 +9,7 @@
       "w": "t_window",
       "G": "t_chaingate_c",
       "|": "t_concrete_wall",
-      "F": "t_chainfence",
+      "F": "t_fence_barbed",
       "!": "t_guardrail",
       "p": "t_pavement",
       "m": "t_door_metal_c",
@@ -35,17 +35,19 @@
       "6": "t_bulk_tank",
       "I": "t_thconc_y",
       "U": "t_metal_floor",
-      "<": "t_stairs_up"
+      "<": "t_stairs_up",
+      "X": "t_thconc_floor"
     },
     "furniture": {
       "C": "f_crate_c",
       "r": "f_rack",
+      "q": "f_rack",
       "z": [ "f_indoor_plant_y", "f_indoor_plant" ],
       "L": "f_locker",
       "4": "f_locker",
       "c": "f_chair",
       "?": "f_console_broken",
-      "g": "f_generator_broken",
+      "g": [ [ "f_generator_broken", 25 ], [ "f_military_generator", 5 ] ],
       "5": "f_machinery_light",
       "s": "f_chair",
       "l": "f_utility_shelf",
@@ -61,7 +63,8 @@
       "7": "f_drill_press",
       "8": "f_router",
       "h": "f_shower",
-      "#": "f_counter"
+      "#": "f_counter",
+      "X": [ [ "f_metal_crate_military", 40 ], [ "f_metal_crate_military_o", 10 ] ]
     }
   },
   {
@@ -72,7 +75,7 @@
       "W": "t_wall_w",
       "-": "t_floor",
       "w": "t_window_domestic",
-      "*": "t_open_air",
+      " ": "t_open_air",
       "=": "t_flat_roof",
       "R": "t_flat_roof",
       "D": "t_flat_roof",
@@ -85,7 +88,7 @@
       "S": "f_sink",
       "j": "f_bench",
       "t": "f_table",
-      "D": "f_small_satelitte_dish"
+      "D": "f_small_satellite_dish"
     }
   }
 ]

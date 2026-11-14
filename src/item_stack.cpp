@@ -2,10 +2,11 @@
 
 #include <algorithm>
 
+#include "debug.h"
 #include "item.h"
+#include "item_location.h"
 #include "output.h"
 #include "units.h"
-#include "debug.h"
 
 size_t item_stack::size() const
 {
@@ -67,17 +68,17 @@ item_stack::const_reverse_iterator item_stack::rend() const
 
 item_stack::iterator item_stack::get_iterator_from_pointer( item *it )
 {
-    return items->get_iterator_from_pointer( it );
+    return items->get_iterator( it );
 }
 
 item_stack::iterator item_stack::get_iterator_from_index( size_t idx )
 {
-    return items->get_iterator_from_index( idx );
+    return cata::get_iterator_from_index( *items, idx );
 }
 
 size_t item_stack::get_index_from_iterator( const item_stack::const_iterator &it )
 {
-    return items->get_index_from_iterator( it );
+    return cata::get_index_from_iterator( *items, it );
 }
 
 item &item_stack::only_item()

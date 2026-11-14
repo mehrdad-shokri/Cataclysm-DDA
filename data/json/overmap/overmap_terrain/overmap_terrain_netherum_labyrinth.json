@@ -1,0 +1,250 @@
+[
+  {
+    "type": "overmap_terrain",
+    "name": "labyrinthian structures",
+    "id": "labyrinth_hall",
+    "sym": "_",
+    "color": "light_blue",
+    "see_cost": "high",
+    "travel_cost_type": "impassable",
+    "flags": [ "LINEAR" ]
+  },
+  {
+    "type": "overmap_terrain",
+    "name": "bosky labyrinth",
+    "id": "labyrinth_overgrown_hall",
+    "color": "light_green",
+    "see_cost": "high",
+    "travel_cost_type": "impassable",
+    "flags": [ "LINEAR" ]
+  },
+  {
+    "type": "overmap_terrain",
+    "name": "terminal",
+    "id": "labyrinth_entrance",
+    "sym": "O",
+    "color": "red",
+    "see_cost": "high",
+    "travel_cost_type": "impassable"
+  },
+  {
+    "type": "overmap_terrain",
+    "name": "root",
+    "id": "labyrinth_overgrown_entrance",
+    "sym": "O",
+    "color": "light_red",
+    "see_cost": "high",
+    "travel_cost_type": "impassable"
+  },
+  {
+    "type": "overmap_terrain",
+    "name": "sparkling chasm",
+    "id": "netherum_labyrinth_sparkling_chasm",
+    "sym": "*",
+    "color": "dark_gray",
+    "see_cost": "high",
+    "travel_cost_type": "impassable",
+    "flags": [ "NO_ROTATE" ]
+  },
+  {
+    "type": "overmap_location",
+    "id": "netherum_labyrinth_sparkling_chasm",
+    "terrains": [ "netherum_labyrinth_sparkling_chasm" ]
+  },
+  {
+    "type": "overmap_terrain",
+    "name": "home away from home",
+    "id": "labyrinth_safehouse",
+    "sym": "@",
+    "color": "white",
+    "see_cost": "high",
+    "travel_cost_type": "impassable",
+    "flags": [ "NO_ROTATE" ]
+  },
+  {
+    "type": "overmap_terrain",
+    "name": "central node",
+    "id": "labyrinth_nl_exit_boiler",
+    "sym": "O",
+    "color": "red",
+    "see_cost": "high",
+    "travel_cost_type": "impassable"
+  },
+  {
+    "type": "overmap_terrain",
+    "name": "flattened landscape",
+    "id": [
+      "labyrinth_string_dimension_tunnel_start",
+      "labyrinth_string_dimension_tunnel_end",
+      "labyrinth_string_dimension_tunnel_left",
+      "labyrinth_string_dimension_tunnel_right",
+      "labyrinth_string_dimension_tunnel_over",
+      "labyrinth_string_dimension_tunnel_under",
+      "labyrinth_string_dimension_tunnel_portal"
+    ],
+    "sym": "-",
+    "color": "light_blue",
+    "see_cost": "high",
+    "travel_cost_type": "impassable",
+    "flags": [ "NO_ROTATE" ]
+  },
+  {
+    "type": "overmap_terrain",
+    "name": "terminal",
+    "id": "labyrinth_flooded_entrance",
+    "sym": "O",
+    "color": "cyan",
+    "see_cost": "high",
+    "travel_cost_type": "impassable"
+  },
+  {
+    "type": "overmap_terrain",
+    "name": "labyrinthian gangways",
+    "id": "labyrinth_flooded_hall",
+    "sym": "_",
+    "color": "light_blue",
+    "see_cost": "high",
+    "travel_cost_type": "impassable",
+    "flags": [ "LINEAR" ]
+  },
+  {
+    "type": "overmap_terrain",
+    "name": "labyrinthian hallways",
+    "id": "labyrinth2",
+    "sym": "+",
+    "color": "light_gray",
+    "see_cost": "high",
+    "travel_cost_type": "impassable"
+  },
+  {
+    "type": "overmap_terrain",
+    "name": "labyrinthian buildings",
+    "id": "labyrinth2_roof",
+    "sym": " ",
+    "color": "light_gray",
+    "see_cost": "low"
+  },
+  {
+    "type": "overmap_terrain",
+    "name": "labyrinthian buildings",
+    "id": "labyrinth2_roof2",
+    "sym": " ",
+    "color": "light_gray",
+    "see_cost": "low"
+  },
+  {
+    "type": "overmap_terrain",
+    "name": "stairwell",
+    "id": "labyrinth2_stairs",
+    "sym": "<",
+    "color": "white",
+    "see_cost": "high",
+    "travel_cost_type": "impassable"
+  },
+  {
+    "type": "overmap_terrain",
+    "name": "labyrinthian structure",
+    "id": [
+      "labyrinth2_scarlet_sea_portal_x0_y0",
+      "labyrinth2_scarlet_sea_portal_x1_y0",
+      "labyrinth2_scarlet_sea_portal_x0_y1",
+      "labyrinth2_scarlet_sea_portal_x1_y1"
+    ],
+    "sym": "+",
+    "color": "light_red",
+    "see_cost": "high",
+    "travel_cost_type": "impassable",
+    "flags": [ "NO_ROTATE" ]
+  },
+  {
+    "type": "overmap_location",
+    "id": "labyrinth2",
+    "terrains": [ "labyrinth2" ]
+  },
+  {
+    "type": "overmap_terrain",
+    "name": "labyrinthian structures",
+    "id": [
+      "labyrinth_sparkgen_UL",
+      "labyrinth_sparkgen_UR",
+      "labyrinth_sparkgen_LL",
+      "labyrinth_sparkgen_LR",
+      "labyrinth_sparkgen_LC",
+      "labyrinth_sparkgen_UC"
+    ],
+    "sym": "+",
+    "color": "light_red",
+    "see_cost": "high",
+    "travel_cost_type": "impassable"
+  },
+  {
+    "type": "overmap_location",
+    "id": "labyrinth2_roof",
+    "terrains": [ "labyrinth2_roof" ]
+  },
+  {
+    "type": "overmap_location",
+    "id": "labyrinth2_roof2",
+    "terrains": [ "labyrinth2_roof2" ]
+  },
+  {
+    "type": "overmap_terrain",
+    "id": [ "labyrinth2_cable_stream", "labyrinth2_cable_stream_end", "labyrinth2_cable_stream_corner" ],
+    "copy-from": "generic_open_land",
+    "name": "labyrinthian wiring harness",
+    "sym": ".",
+    "color": "light_red",
+    "see_cost": "low",
+    "flags": [ "REQUIRES_PREDECESSOR" ]
+  },
+  {
+    "type": "overmap_terrain",
+    "abstract": "labyrinth2_sparkling_chasm_field",
+    "copy-from": "generic_open_land",
+    "name": "sparkling maw",
+    "sym": "+",
+    "color": "light_gray",
+    "flags": [ "REQUIRES_PREDECESSOR" ]
+  },
+  {
+    "type": "overmap_terrain",
+    "id": "labyrinth2_sparkling_chasm_field_core",
+    "copy-from": "labyrinth2_sparkling_chasm_field",
+    "extend": { "flags": [ "NO_ROTATE" ] }
+  },
+  {
+    "type": "overmap_terrain",
+    "id": "labyrinth2_sparkling_chasm_field_end",
+    "copy-from": "labyrinth2_sparkling_chasm_field"
+  },
+  {
+    "type": "overmap_terrain",
+    "id": [
+      "labyrinth2_utility_tunnel_four_way",
+      "labyrinth2_utility_tunnel_T",
+      "labyrinth2_utility_tunnel_straight",
+      "labyrinth2_utility_tunnel_corner",
+      "labyrinth2_utility_tunnel_end"
+    ],
+    "name": "labyrinthian walkway",
+    "sym": "#",
+    "color": "white",
+    "see_cost": "low",
+    "flags": [ "REQUIRES_PREDECESSOR" ]
+  },
+  {
+    "type": "overmap_terrain",
+    "id": [
+      "labyrinth2_utility_tunnel_four_way_stairs",
+      "labyrinth2_utility_tunnel_four_way_stairs_shaft-1",
+      "labyrinth2_utility_tunnel_four_way_stairs_shaft-2",
+      "labyrinth2_utility_tunnel_four_way_stairs_shaft-3",
+      "labyrinth2_utility_tunnel_four_way_stairs_base"
+    ],
+    "name": "ladder",
+    "sym": "H",
+    "color": "white",
+    "see_cost": "low",
+    "flags": [ "REQUIRES_PREDECESSOR" ]
+  }
+]

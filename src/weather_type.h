@@ -2,20 +2,25 @@
 #ifndef CATA_SRC_WEATHER_TYPE_H
 #define CATA_SRC_WEATHER_TYPE_H
 
-#include <algorithm>
-#include <climits>
+#include <cstdint>
+#include <functional>
+#include <optional>
 #include <string>
+#include <string_view>
+#include <utility>
 #include <vector>
 
-#include "bodypart.h"
 #include "calendar.h"
+#include "catacharset.h"
 #include "color.h"
-#include "field.h"
-#include "string_id.h"
-#include "translations.h"
+#include "field_type.h"
+#include "lightmap.h"
+#include "translation.h"
 #include "type_id.h"
+#include "units.h"
 
 class JsonObject;
+struct const_dialogue;
 template <typename E> struct enum_traits;
 template<typename T>
 class generic_factory;
@@ -35,37 +40,19 @@ struct enum_traits<precip_class> {
     static constexpr precip_class last = precip_class::last;
 };
 
-enum class sun_intensity_type : int {
-    none,
-    light,
-    normal,
-    high,
-    last
-};
-template<>
-struct enum_traits<sun_intensity_type > {
-    static constexpr sun_intensity_type last = sun_intensity_type::last;
-};
-
-enum class weather_time_requirement_type : int {
-    day,
-    night,
-    both,
-    last
-};
-template<>
-struct enum_traits<weather_time_requirement_type> {
-    static constexpr weather_time_requirement_type last = weather_time_requirement_type::last;
-};
-
 enum weather_sound_category : int {
     silent,
     drizzle,
     rainy,
+    rainstorm,
     thunder,
     flurries,
     snowstorm,
     snow,
+    portal_storm,
+    clear,
+    sunny,
+    cloudy,
     last
 };
 
@@ -78,67 +65,14 @@ struct enum_traits<weather_sound_category> {
  * Weather animation class.
  */
 struct weather_animation_t {
-    float    factor;
-    nc_color color;
-    char     glyph;
-};
+    float factor = 0.0f;
+    nc_color color = c_white;
+    uint32_t symbol = NULL_UNICODE;
+    std::string get_symbol() const {
+        return utf32_to_utf8( symbol );
+    }
 
-struct weather_requirements {
-    int windpower_min = INT_MIN;
-    int windpower_max = INT_MAX;
-    int temperature_min = INT_MIN;
-    int temperature_max = INT_MAX;
-    int pressure_min = INT_MIN;
-    int pressure_max = INT_MAX;
-    int humidity_min = INT_MIN;
-    int humidity_max = INT_MAX;
-    bool humidity_and_pressure = true;
-    weather_time_requirement_type time;
-    std::vector<weather_type_id> required_weathers;
-    time_duration time_passed_min;
-    time_duration time_passed_max;
-    int one_in_chance;
-};
-
-struct weather_field {
-    field_type_str_id type;
-    int intensity;
-    time_duration age;
-    int radius;
-    bool outdoor_only;
-};
-
-struct spawn_type {
-    mtype_id target;
-    int target_range;
-    int hallucination_count;
-    int real_count;
-    int min_radius;
-    int max_radius;
-};
-
-struct weather_effect {
-    int one_in_chance;
-    time_duration time_between;
-    translation message;
-    bool must_be_outside;
-    translation sound_message;
-    std::string sound_effect;
-    bool lightning;
-    bool rain_proof;
-    int pain;
-    int pain_max;
-    int wet;
-    int radiation;
-    int healthy;
-    efftype_id effect_id;
-    time_duration effect_duration;
-    trait_id trait_id_to_add;
-    trait_id trait_id_to_remove;
-    bodypart_str_id target_part;
-    int damage;
-    std::vector<spawn_type> spawns;
-    std::vector<weather_field> fields;
+    void deserialize( const JsonObject &jo );
 };
 
 struct weather_type {
@@ -146,31 +80,68 @@ struct weather_type {
         friend class generic_factory<weather_type>;
         bool was_loaded = false;
         weather_type_id id;
-        std::string name;             //!< UI name of weather type.
-        nc_color color;               //!< UI color of weather type.
-        nc_color map_color;           //!< Map color of weather type.
-        char glyph;                   //!< Map glyph of weather type.
-        int ranged_penalty;           //!< Penalty to ranged attacks.
-        float sight_penalty;          //!< Penalty to per-square visibility, applied in transparency map.
-        int light_modifier;           //!< Modification to ambient light.
-        int sound_attn;               //!< Sound attenuation of a given weather type.
-        bool dangerous;               //!< If true, our activity gets interrupted.
-        precip_class precip;          //!< Amount of associated precipitation.
-        bool rains;                   //!< Whether said precipitation falls as rain.
-        bool acidic;                  //!< Whether said precipitation is acidic.
-        std::vector<weather_effect> effects;      //!< vector for weather effects.
-        std::string tiles_animation;  //!< string for tiles animation
-        weather_animation_t weather_animation; //!< Information for weather animations
-        weather_sound_category sound_category; //!< if playing sound effects what to use
-        sun_intensity_type sun_intensity; //!< strength of the sun
-        weather_requirements requirements; //!< when this weather should happen
-        time_duration duration_min;
-        time_duration duration_max;
-        time_duration time_between_min;
-        time_duration time_between_max;
-        void load( const JsonObject &jo, const std::string &src );
+        std::vector<std::pair<weather_type_id, mod_id>> src;
+        // UI name of weather type.
+        translation name;
+        // UI color of weather type.
+        nc_color color = c_white;
+        // Map color of weather type.
+        nc_color map_color = c_white;
+        // Map glyph of weather type.
+        uint32_t symbol = PERCENT_SIGN_UNICODE;
+        // Sun glyph of weather type.
+        uint32_t sun_symbol = NULL_UNICODE;
+        // Penalty to ranged attacks.
+        int ranged_penalty = 0;
+        // Penalty to per-square visibility, applied in transparency map.
+        float sight_penalty = 0.0f;
+        // Modification to ambient light.
+        int light_modifier = 0;
+        // Increases or decreases average temperature when this weather is active
+        units::temperature_delta temperature_modifier = 0_K_delta;
+        // Multiplier to ambient light.
+        float light_multiplier = 1.f;
+        // Multiplier to radiation from Sun.
+        float sun_multiplier = 1.f;
+        // Sound attenuation of a given weather type.
+        int sound_attn = 0;
+        // If true, our activity gets interrupted.
+        bool dangerous = false;
+        // Amount of associated precipitation.
+        precip_class precip = precip_class::none;
+        // Whether said precipitation falls as rain.
+        bool rains = false;
+        // string for tiles animation
+        std::string tiles_animation;
+        // Information for weather animations
+        weather_animation_t weather_animation;
+        // if playing sound effects what to use
+        weather_sound_category sound_category = weather_sound_category::silent;
+        // if multiple weather conditions are true the higher priority wins
+        int priority = 0;
+        // when this weather should happen
+        std::function<bool( const_dialogue const & )> condition;
+        std::vector<weather_type_id> required_weathers;
+        time_duration duration_min = 0_turns;
+        time_duration duration_max = 0_turns;
+        std::optional<std::string> debug_cause_eoc;
+        std::optional<std::string> debug_leave_eoc;
+        // what effects are applied to you when you visit this dimension
+        // and what protection you may use to counter it
+        std::vector<field_effect> passive_effect;
+        // light color tint applied when weather is active.
+        // defaults to no color.
+        light_color_rgb tint_color{};
+        float tint_strength = 0.0f;
+        void load( const JsonObject &jo, std::string_view src );
         void finalize();
         void check() const;
+        std::string get_symbol() const {
+            return utf32_to_utf8( symbol );
+        }
+        std::string get_sun_symbol() const {
+            return utf32_to_utf8( sun_symbol );
+        }
         weather_type() = default;
 };
 namespace weather_types

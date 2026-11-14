@@ -1,0 +1,55 @@
+[
+  {
+    "type": "effect_type",
+    "id": "effect_xe_nether_resonance_consequences",
+    "//": "Deliberately not visible in character tab. 1 Intensity = 1 resonance, clears at 600 per hour",
+    "name": [ "" ],
+    "desc": [ "" ],
+    "max_intensity": 20000,
+    "int_dur_factor": "6 s",
+    "enchantments": [
+      {
+        "values": [
+          {
+            "value": "ARTIFACT_RESONANCE",
+            "add": { "math": [ "u_effect_intensity('effect_xe_nether_resonance_consequences')" ] }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "type": "effect_type",
+    "id": "effect_xe_nether_sorcery_cold_damage_over_time",
+    "name": [ "Ebon Bindings" ],
+    "desc": [ "You cannot move!" ],
+    "remove_message": "You can move again.",
+    "show_in_info": true,
+    "rating": "bad",
+    "flags": [ "CANNOT_MOVE" ]
+  },
+  {
+    "type": "effect_type",
+    "id": "effect_xe_nether_sorcery_cause_withering_damage",
+    "name": [ "The Withering" ],
+    "desc": [ "You are slowed." ],
+    "remove_message": "Your strength returns.",
+    "rating": "bad",
+    "show_in_info": true,
+    "base_mods": { "hit_mod": [ -2 ], "dodge_mod": [ -2 ], "speed_mod": [ -30 ] }
+  },
+  {
+    "type": "effect_type",
+    "id": "effect_xe_nether_sorcery_wind_dodge_shell",
+    "name": [ "Shell of the Four Winds" ],
+    "desc": [ "The wind helps you avoid attacks." ],
+    "remove_message": "The wind around you dies down.",
+    "rating": "good",
+    "enchantments": [
+      {
+        "values": [ { "value": "EVASION", "add": 0.4 }, { "value": "RANGE_DODGE", "add": 0.8 }, { "value": "BONUS_DODGE", "add": 1 } ]
+      }
+    ],
+    "flags": [ "HARDTOHIT" ]
+  }
+]

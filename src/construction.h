@@ -2,24 +2,24 @@
 #ifndef CATA_SRC_CONSTRUCTION_H
 #define CATA_SRC_CONSTRUCTION_H
 
-#include <algorithm>
 #include <functional>
 #include <list>
 #include <map>
+#include <optional>
 #include <set>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
-#include "int_id.h"
+#include "coords_fwd.h"
+#include "game_constants.h"
 #include "item.h"
-#include "optional.h"
-#include "string_id.h"
+#include "translation.h"
 #include "type_id.h"
 
-class inventory;
-class player;
-struct construction;
+class Character;
+class temp_crafting_inventory;
 struct point;
 
 namespace catacurses
@@ -28,42 +28,31 @@ class window;
 } // namespace catacurses
 class JsonObject;
 class nc_color;
-struct tripoint;
 
 struct partial_con {
     int counter = 0;
-    std::list<item> components = {};
+    std::list<item> components;
     construction_id id = construction_id( -1 );
 };
-
-struct build_reqs {
-    std::map<skill_id, int> skills;
-    std::map<requirement_id, int> reqs;
-    int time = 0;
-};
-
-template <>
-const construction &construction_id::obj() const;
-template <>
-bool construction_id::is_valid() const;
 
 struct construction {
         // Construction type category
         construction_category_id category;
-        // How the action is displayed to the player
-        std::string description;
+        // Which group does this construction belong to.
+        construction_group_str_id group;
         // Additional note displayed along with construction requirements.
-        std::string pre_note;
-        // Beginning terrain for construction
-        std::string pre_terrain;
+        translation pre_note;
+        // Beginning terrain(s) for construction
+        std::set<std::string> pre_terrain;
         // Final terrain after construction
         std::string post_terrain;
 
         // Item group of byproducts created by the construction on success.
-        cata::optional<std::string> byproduct_item_group;
+        std::optional<item_group_id> byproduct_item_group;
 
-        // Flags beginning terrain must have
-        std::set<std::string> pre_flags;
+        // Flags beginning furniture/terrain must have
+        // Second element forces flags to be evaluated on terrain
+        std::map<std::string, bool> pre_flags;
 
         // Post construction flags
         std::set<std::string> post_flags;
@@ -74,22 +63,29 @@ struct construction {
         std::vector<std::pair<requirement_id, int>> reqs_using;
         requirement_id requirements;
 
+        bool is_blacklisted() const;
+
         // Index in construction vector
-        construction_id id = construction_id( -1 );
-        construction_str_id str_id = construction_str_id::NULL_ID();
+        construction_str_id id;
+        void load( const JsonObject &jo, std::string_view );
+        void check() const;
+        void finalize();
 
         // Time in moves
         int time = 0;
 
+        bool was_loaded = false;
         // If true, the requirements are generated during finalization
         bool vehicle_start = false;
 
         // Custom constructibility check
-        std::function<bool( const tripoint & )> pre_special;
+        std::vector<bool ( * )( const tripoint_bub_ms & )> pre_specials;
+        // Custom while constructing effects
+        void ( *do_turn_special )( const tripoint_bub_ms &, Character & );
         // Custom after-effects
-        std::function<void( const tripoint & )> post_special;
+        std::vector<void ( * )( const tripoint_bub_ms &, Character & )> post_specials;
         // Custom error message display
-        std::function<void( const tripoint & )> explain_failure;
+        void ( *explain_failure )( const tripoint_bub_ms & );
         // Whether it's furniture or terrain
         bool pre_is_furniture = false;
         // Whether it's furniture or terrain
@@ -107,26 +103,33 @@ struct construction {
 
         //can be build in the dark
         bool dark_craftable = false;
+
+        // if true, this construction will only look for prerequisites in the same group
+        bool strict = false;
+
+        float activity_level = MODERATE_EXERCISE;
     private:
         std::string get_time_string() const;
 };
 
 const std::vector<construction> &get_constructions();
 
-//! Set all constructions to take the specified time.
-void standardize_construction_times( int time );
-
-void load_construction( const JsonObject &jo );
+void place_construction( std::vector<construction_group_str_id> const &groups );
+void load_construction( const JsonObject &jo, const std::string &src );
 void reset_constructions();
 construction_id construction_menu( bool blueprint );
-void complete_construction( player *p );
-bool can_construct( const construction &con, const tripoint &p );
-bool player_can_build( player &p, const inventory &inv, const construction &con );
-bool player_can_see_to_build( player &p, const std::string &desc );
+bool has_pre_flags( const construction &con, furn_id const &f, ter_id const &t );
+bool can_construct( const construction &con, const tripoint_bub_ms &p );
+bool player_can_build( Character &you, const temp_crafting_inventory &inv, const construction &con,
+                       bool can_construct_skip = false );
+std::vector<const construction *> constructions_by_group( const construction_group_str_id &group );
+std::vector<const construction *> constructions_by_filter(
+    std::function<bool( construction const & )>
+    const &filter );
 void check_constructions();
 void finalize_constructions();
-
-void get_build_reqs_for_furn_ter_ids( const std::pair<std::map<ter_id, int>,
-                                      std::map<furn_id, int>> &changed_ids,
-                                      build_reqs &total_reqs );
+void prompt_partial_construction( Character &you, tripoint_bub_ms const &examp );
+std::vector<construction_id> find_build_sequence( const std::string &target_id,
+        std::function<bool( construction const & )> const &filter,
+        std::function<bool( construction const & )> const &can_build );
 #endif // CATA_SRC_CONSTRUCTION_H

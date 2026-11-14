@@ -1,0 +1,20 @@
+[
+  {
+    "type": "item_group",
+    "id": "innawoods_chunk_random",
+    "subtype": "distribution",
+    "entries": [
+      { "item": "chunk_feldspar", "prob": 10 },
+      { "item": "chunk_copper", "prob": 1 },
+      { "item": "chunk_cassiterite", "prob": 1 },
+      { "item": "chunk_hematite", "prob": 2 }
+    ]
+  },
+  {
+    "type": "item_group",
+    "id": "SUS_trash_forest_no_manmade",
+    "subtype": "collection",
+    "copy-from": "SUS_trash_forest_no_manmade",
+    "extend": { "entries": [ { "group": "innawoods_chunk_random", "prob": 1 } ] }
+  }
+]

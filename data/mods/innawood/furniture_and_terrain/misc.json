@@ -1,0 +1,50 @@
+[
+  {
+    "type": "furniture",
+    "id": "f_beaver_dam",
+    "name": "dam",
+    "description": "A house that beavers built.  The entrance is underwater making it harder for predators to access.",
+    "symbol": "#",
+    "color": "brown",
+    "looks_like": "t_wall_log",
+    "move_cost_mod": 2,
+    "required_str": -1,
+    "flags": [ "FLAMMABLE_ASH", "TRANSPARENT" ],
+    "bash": {
+      "str_min": 6,
+      "str_max": 12,
+      "sound": "crunch.",
+      "sound_fail": "bonk.",
+      "items": [
+        { "item": "twig", "count": [ 5, 12 ] },
+        { "item": "stick", "count": [ 5, 12 ] },
+        { "item": "stick_long", "count": [ 5, 12 ] },
+        { "item": "splinter", "count": [ 12, 38 ] }
+      ],
+      "hit_field": [ "fd_dust", 2 ],
+      "destroyed_field": [ "fd_splinters", 1 ]
+    }
+  },
+  {
+    "type": "furniture",
+    "id": "f_boulder_large",
+    "copy-from": "f_boulder_large",
+    "bash": {
+      "str_min": 64,
+      "str_max": 160,
+      "sound": "smash!",
+      "sound_fail": "thump.",
+      "items": [
+        { "item": "rock", "count": [ 65, 85 ] },
+        { "item": "sharp_rock", "count": [ 5, 9 ] },
+        { "item": "material_limestone", "count": [ 2, 5 ], "prob": 30 },
+        { "item": "material_rocksalt", "count": [ 0, 1 ], "prob": 10 },
+        { "item": "material_rhodonite", "count": [ 0, 1 ], "prob": 1 },
+        { "item": "material_zincite", "count": [ 0, 5 ], "prob": 2 },
+        { "item": "chunk_feldspar", "count": [ 2, 5 ], "prob": 25 },
+        { "item": "chunk_graphite", "count": [ 0, 1 ], "prob": 1 },
+        { "item": "chunk_caco3", "count": [ 0, 1 ], "prob": 30 }
+      ]
+    }
+  }
+]

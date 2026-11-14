@@ -2,28 +2,32 @@
 #ifndef CATA_SRC_AUTO_PICKUP_H
 #define CATA_SRC_AUTO_PICKUP_H
 
-#include <algorithm>
 #include <functional>
-#include <iosfwd>
+#include <list>
 #include <string>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
+#include "coords_fwd.h"
 #include "enums.h"
+#include "item_stack.h"
 
-class JsonIn;
+class JsonArray;
+class JsonObject;
 class JsonOut;
 class item;
+class item_location;
 struct itype;
 
 namespace auto_pickup
 {
-
+std::list<std::pair<item_location, int>> select_items(
+        const std::vector<item_stack::iterator> &from, const tripoint_bub_ms &location );
 /**
- * The currently-active set of auto-pickup rules, in a form that allows quick
- * lookup. When this is filled (by @ref auto_pickup::create_rule()), every
- * item existing in the game that matches a rule (either white- or blacklist)
- * is added as the key, with rule_state::WHITELISTED or rule_state::BLACKLISTED as the values.
+ * The currently-active set of auto-pickup rules, in a form that allows quick lookup.
+ * When this is filled, items that match a rule are stored with  rule_state::WHITELISTED or rule_state::BLACKLISTED.
+ * Unmatched items may be cached as rule_state::NONE.
  */
 class cache : public std::unordered_map<std::string, rule_state>
 {
@@ -52,7 +56,7 @@ class rule
         }
 
         void serialize( JsonOut &jsout ) const;
-        void deserialize( JsonIn &jsin );
+        void deserialize( const JsonObject &jo );
 
         void test_pattern() const;
 };
@@ -64,7 +68,7 @@ class rule_list : public std::vector<rule>
 {
     public:
         void serialize( JsonOut &jsout ) const;
-        void deserialize( JsonIn &jsin );
+        void deserialize( const JsonArray &ja );
 
         void refresh_map_items( cache &map_items ) const;
 
@@ -87,7 +91,6 @@ class user_interface
 
         std::string title;
         std::vector<tab> tabs;
-        bool is_autopickup = false;
 
         void show();
 
@@ -124,9 +127,11 @@ class player_settings : public base_settings
 
     public:
         ~player_settings() override = default;
+        using base_settings::check_item;
+        rule_state check_item( const item &it );
         void create_rule( const item *it );
         bool has_rule( const item *it );
-        void add_rule( const item *it );
+        void add_rule( const item *it, bool include );
         void remove_rule( const item *it );
 
         void clear_character_rules();
@@ -154,7 +159,7 @@ class npc_settings : public base_settings
         void show( const std::string &name );
 
         void serialize( JsonOut &jsout ) const;
-        void deserialize( JsonIn &jsin );
+        void deserialize( const JsonArray &ja );
 
         bool empty() const;
 };

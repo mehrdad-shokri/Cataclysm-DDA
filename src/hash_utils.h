@@ -25,7 +25,7 @@ namespace tuple_hash_detail
 {
 
 // Recursive template code derived from Matthieu M.
-template < class Tuple, size_t Index = std::tuple_size<Tuple>::value - 1 >
+template < class Tuple, size_t Index = std::tuple_size_v<Tuple> - 1 >
 struct Impl
 {
     static void apply( size_t &seed, const Tuple &tuple ) {
@@ -85,6 +85,34 @@ struct range_hash {
         return seed;
     }
 };
+
+namespace hash64_detail
+{
+
+template<typename T>
+std::enable_if_t < sizeof( T ) < 8, T > maybe_mix_bits( std::uint64_t val )
+{
+    std::uint32_t hi = val >> 32;
+    std::uint32_t lo = val;
+    T ret = hi;
+    hash_combine( ret, lo );
+    return ret;
+}
+
+template<typename T>
+std::enable_if_t < sizeof( T ) >= 8, T > maybe_mix_bits( std::uint64_t val )
+{
+    return val;
+}
+
+} // namespace hash64_detail
+
+// hash64 hashes a 64-bit integer, either using the identity function (on 64-bit systems)
+// or using hash_combine on the two 32-bit halves (on 32-bit systems)
+inline std::size_t hash64( std::uint64_t val )
+{
+    return hash64_detail::maybe_mix_bits<std::size_t>( val );
+}
 
 } // namespace cata
 

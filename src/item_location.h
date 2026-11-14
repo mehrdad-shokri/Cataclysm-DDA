@@ -2,17 +2,41 @@
 #ifndef CATA_SRC_ITEM_LOCATION_H
 #define CATA_SRC_ITEM_LOCATION_H
 
+#include <climits>
+#include <cstddef>
+#include <cstdint>
+#include <functional>
+#include <list>
 #include <memory>
+#include <set>
 #include <string>
+#include <utility>
 
-#include "map_selector.h"
+#include "coords_fwd.h"
+#include "pocket_type.h"
+#include "units_fwd.h"
+#include "visitable.h"
 
-struct tripoint;
-class item;
 class Character;
-class vehicle_cursor;
-class JsonIn;
+class JsonObject;
 class JsonOut;
+class const_talker;
+class item;
+class item_pocket;
+class pocket_constraint;
+class map;
+class map_cursor;
+class talker;
+class temp_crafting_inventory;
+class vehicle_cursor;
+
+/**
+ * Returns a reference to a null item (see @ref item::is_null). The reference is always valid
+ * and stays valid until the program ends.
+ */
+item &null_item_reference();
+
+template<typename T> class ret_val;
 
 /**
  * A lightweight handle to an item independent of it's location
@@ -20,7 +44,7 @@ class JsonOut;
  * Provides a generic interface of querying, obtaining and removing an item
  * Is invalidated by many operations (including copying of the item)
  */
-class item_location
+class item_location : public visitable
 {
     public:
         enum class type : int {
@@ -28,7 +52,9 @@ class item_location
             character = 1,
             map = 2,
             vehicle = 3,
-            container = 4
+            container = 4,
+            // these are ALL pseudo items of some variety!
+            crafting_inventory = 5
         };
 
         item_location();
@@ -39,12 +65,16 @@ class item_location
         item_location( const map_cursor &mc, item *which );
         item_location( const vehicle_cursor &vc, item *which );
         item_location( const item_location &container, item *which );
+        item_location( temp_crafting_inventory &inv, item *which );
+
 
         void serialize( JsonOut &js ) const;
-        void deserialize( JsonIn &js );
+        void deserialize( const JsonObject &obj );
 
         bool operator==( const item_location &rhs ) const;
         bool operator!=( const item_location &rhs ) const;
+        // this compares pointers! implemented for std::set implementation
+        bool operator<( const item_location &rhs ) const;
 
         explicit operator bool() const;
 
@@ -57,14 +87,22 @@ class item_location
         /** Returns the type of location where the item is found */
         type where() const;
 
+        bool valid() const;
+
+        /** Returns the type of location where the topmost container of the item is found.
+         *  Therefore can not return item_location::type::container */
+        type where_recursive() const;
+
         /** Returns the position where the item is found */
-        tripoint position() const;
+        tripoint_bub_ms pos_bub( const map &here ) const;
+        tripoint_abs_ms pos_abs() const;
 
         /** Describes the item location
          *  @param ch if set description is relative to character location */
         std::string describe( const Character *ch = nullptr ) const;
 
         /** Move an item from the location to the character inventory
+         *  If the player fails to obtain the item (likely due to a menu) returns item_location{}
          *  @param ch Character who's inventory gets the item
          *  @param qty if specified limits maximum obtained charges
          *  @warning caller should restack inventory if item is to remain in it
@@ -79,10 +117,12 @@ class item_location
 
         /** Removes the selected item from the game
          *  @warning all further operations using this class are invalid */
-        void remove_item();
+        void remove_item( item & = null_item_reference() );
 
         /** Handles updates to the item location, mostly for caching. */
         void on_contents_changed();
+
+        void make_active();
 
         /** Gets the selected item or nullptr */
         item *get_item();
@@ -92,9 +132,16 @@ class item_location
 
         /** returns the parent item, or an invalid location if it has no parent */
         item_location parent_item() const;
+        item_pocket *parent_pocket() const;
+
+        /** returns the character whose inventory contains this item, nullptr if none **/
+        Character *carrier() const;
+
+        /** returns the vehicle whose inventory contains this item, nullptr if none **/
+        const vehicle_cursor *veh_cursor() const;
 
         /** returns true if the item is in the inventory of the given character **/
-        bool held_by( Character &who ) const;
+        bool held_by( Character const &who ) const;
 
         /**
          * true if this item location can and does have a parent
@@ -103,12 +150,101 @@ class item_location
          **/
         bool has_parent() const;
 
-        bool parents_can_contain_recursive( item *it ) const;
+        /**
+        * Returns whether the item location is inside an e-device)
+        */
+        bool is_efile() const;
 
+        /**
+        * Returns true if the item is a gunmod, is installed on a gun
+        * and allowed to be used directly from inventory
+        */
+        bool is_invisible_installed_gunmod() const;
+
+        /**
+        * Returns available volume capacity where this item is located.
+        */
+        units::volume volume_capacity() const;
+
+        /**
+        * Returns available weight capacity where this item is located.
+        */
+        units::mass weight_capacity() const;
+
+        /**
+        * Returns true if volume and weight capacity of all parent pockets >= 0
+        */
+        bool check_parent_capacity_recursive() const;
+
+        /**
+        * returns the pocket-related limitations (on volume_capacity, etc.) on this item due to ancestor pockets.
+        * @param pocket optional. begins with the limits of the given pocket, which must be in this location.
+        */
+        pocket_constraint get_pocket_constraints_recursive( const item_pocket *pocket = nullptr ) const;
+        ret_val<void> parents_can_contain_recursive( item *it ) const;
+        ret_val<int> max_charges_by_parent_recursive( const item &it ) const;
+
+        /**
+         * Returns whether another item is eventually contained by this item
+         */
+        bool eventually_contains( item_location loc ) const;
+
+        /**
+         * Overflow items into parent pockets recursively
+         */
+        void overflow( map &here );
+
+        /**
+         * returns whether the item can be reloaded with the specified item.
+         * @param ammo item to be loaded in
+         * @param now whether the currently contained ammo/magazine should be taken into account
+         */
+        bool can_reload_with( const item_location &ammo, bool now ) const;
+
+        /**
+        * returns the item's level of the specified quality.
+        * @param quality the name of quality to check the level of
+        * @param strict_boiling True if containers must be empty to have BOIL quality
+        */
+        int get_quality( const std::string &quality, bool strict_boiling ) const;
+
+        /**
+         * Open a menu for the player to set pocket favorite settings for the pockets in the item's item_contents.
+         */
+        void favorite_settings_menu();
+
+        VisitResponse visit_contents( const std::function<VisitResponse( const item_location & )> &func,
+                                      const std::set<pocket_type> &allowed_pockets = {pocket_type::CONTAINER} ) const;
+        VisitResponse visit_items( const std::function<VisitResponse( const item_location & )> &func ) const
+        override;
+        std::list<item> remove_items_with( const std::function<bool( const item &e )> &filter,
+                                           int count = INT_MAX ) override;
     private:
         class impl;
 
         std::shared_ptr<impl> ptr;
 };
+std::unique_ptr<talker> get_talker_for( item_location &it );
+std::unique_ptr<const_talker> get_const_talker_for( const item_location &it );
+std::unique_ptr<talker> get_talker_for( item_location *it );
+
+namespace std
+{
+template <>
+struct hash<item_location> {
+    std::size_t operator()( const item_location &it ) const noexcept {
+        return static_cast<size_t>( it.where() );
+    }
+};
+} // namespace std
+
+struct item_locator_hint;
+
+// Resolve an item by its uid, starting from the hint.  Returns invalid
+// item_location if not found within the accepted resolution boundary.
+item_location find_item_by_uid( int64_t uid, const item_locator_hint &hint );
+
+using drop_location = std::pair<item_location, int>;
+using drop_locations = std::list<drop_location>;
 
 #endif // CATA_SRC_ITEM_LOCATION_H

@@ -1,7 +1,6 @@
 [
   {
     "type": "mapgen",
-    "method": "json",
     "om_terrain": "island_sand",
     "object": {
       "fill_ter": "t_sand",
@@ -32,7 +31,7 @@
         "****~~**~~~//~~~~~~*****"
       ],
       "place_vehicles": [
-        { "vehicle": "boat_motor_single", "x": 4, "y": 5, "rotation": 180, "chance": 5, "status": 3 },
+        { "vehicle": "boat_motor_single", "x": 4, "y": 5, "rotation": 180, "chance": 10, "status": 3 },
         { "vehicle": "canoe", "x": 5, "y": 0, "rotation": 180, "chance": 5, "status": 0 }
       ],
       "place_loot": [ { "item": "rope_30", "x": 4, "y": 1, "chance": 100 }, { "item": "rope_30", "x": 7, "y": 2, "chance": 100 } ],
@@ -48,15 +47,14 @@
             [ "small_camp_8x8", 5 ],
             [ "gone_fishing_3x3", 5 ]
           ],
-          "x": [ 3, 20 ],
-          "y": [ 3, 20 ]
+          "x": [ 3, 16 ],
+          "y": [ 3, 16 ]
         }
       ]
     }
   },
   {
     "type": "mapgen",
-    "method": "json",
     "om_terrain": "island_forest",
     "object": {
       "predecessor_mapgen": "forest",
@@ -70,15 +68,14 @@
             [ "small_camp_8x8", 5 ],
             [ "gone_fishing_3x3", 5 ]
           ],
-          "x": [ 3, 20 ],
-          "y": [ 3, 20 ]
+          "x": [ 3, 16 ],
+          "y": [ 3, 16 ]
         }
       ]
     }
   },
   {
     "type": "mapgen",
-    "method": "json",
     "om_terrain": "island_forest_thick",
     "object": {
       "predecessor_mapgen": "forest_thick",
@@ -92,15 +89,14 @@
             [ "small_camp_8x8", 5 ],
             [ "gone_fishing_3x3", 5 ]
           ],
-          "x": [ 3, 20 ],
-          "y": [ 3, 20 ]
+          "x": [ 3, 16 ],
+          "y": [ 3, 16 ]
         }
       ]
     }
   },
   {
     "type": "mapgen",
-    "method": "json",
     "om_terrain": "island_forest_water",
     "object": {
       "predecessor_mapgen": "forest_water",
@@ -114,15 +110,14 @@
             [ "small_camp_8x8", 5 ],
             [ "gone_fishing_3x3", 5 ]
           ],
-          "x": [ 3, 20 ],
-          "y": [ 3, 20 ]
+          "x": [ 3, 16 ],
+          "y": [ 3, 16 ]
         }
       ]
     }
   },
   {
     "type": "mapgen",
-    "method": "json",
     "om_terrain": "island_field",
     "object": {
       "predecessor_mapgen": "field",
@@ -136,8 +131,8 @@
             [ "small_camp_8x8", 5 ],
             [ "gone_fishing_3x3", 5 ]
           ],
-          "x": [ 3, 20 ],
-          "y": [ 3, 20 ]
+          "x": [ 3, 16 ],
+          "y": [ 3, 16 ]
         }
       ]
     }

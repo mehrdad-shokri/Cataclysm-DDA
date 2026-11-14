@@ -1,17 +1,69 @@
+#include "character_oracle.h"
+
+#include <algorithm>
 #include <memory>
+#include <optional>
+#include <string>
 #include <vector>
 
+#include "basecamp.h"
 #include "behavior.h"
+#include "bodypart.h"
+#include "calendar.h"
 #include "character.h"
-#include "character_oracle.h"
+#include "coordinates.h"
 #include "item.h"
+#include "item_location.h"
 #include "itype.h"
+#include "map.h"
+#include "mapdata.h"
+#include "npc.h"
+#include "npc_arbitration.h"
+#include "overmapbuffer.h"
+#include "point.h"
 #include "ret_val.h"
 #include "type_id.h"
-#include "value_ptr.h"
+#include "units.h"
+#include "vehicle.h"
+#include "vpart_position.h"
 #include "weather.h"
 
-static const std::string flag_FIRESTARTER( "FIRESTARTER" );
+static const efftype_id effect_npc_run_away( "npc_run_away" );
+static const json_character_flag json_flag_CANNOT_MOVE( "CANNOT_MOVE" );
+static const json_character_flag json_flag_CANNOT_SLEEP( "CANNOT_SLEEP" );
+static const trait_id trait_IGNORE_SOUND( "IGNORE_SOUND" );
+
+// Vehicle currently in motion that the player is inside, otherwise nullptr.
+// NPCs should neither path toward it (collision risk) nor try to board it.
+static const vehicle *player_moving_vehicle()
+{
+    const Character &p = get_player_character();
+    if( !p.in_vehicle ) {
+        return nullptr;
+    }
+    const optional_vpart_position vp = get_map().veh_at( p.pos_bub() );
+    if( !vp ) {
+        return nullptr;
+    }
+    const vehicle &veh = vp->vehicle();
+    return veh.velocity != 0 ? &veh : nullptr;
+}
+
+// Whether the NPC is on any tile belonging to their assigned camp,
+// including expansions.  Falls back to base-OMT match when the camp
+// object is gone (abandoned) but assigned_camp is still set.
+static bool npc_within_camp( const npc &n )
+{
+    if( !n.assigned_camp ) {
+        return false;
+    }
+    std::optional<basecamp *> bcp = overmap_buffer.find_camp( n.assigned_camp->xy() );
+    if( !bcp || !*bcp ) {
+        // Camp object gone -- fall back to base-OMT check.
+        return n.pos_abs_omt() == *n.assigned_camp;
+    }
+    return ( *bcp )->point_within_camp( n.pos_abs_omt() );
+}
 
 namespace behavior
 {
@@ -19,7 +71,7 @@ namespace behavior
 // To avoid a local minima when the character has access to warmth in a shelter but gets cold
 // when they go outside, this method needs to only alert when travel time to known shelter
 // approaches time to freeze.
-status_t character_oracle_t::needs_warmth_badly( const std::string & ) const
+status_t character_oracle_t::needs_temperature_regulation( std::string_view ) const
 {
     // Use player::temp_conv to predict whether the Character is "in trouble".
     for( const bodypart_id &bp : subject->get_all_body_parts() ) {
@@ -30,25 +82,37 @@ status_t character_oracle_t::needs_warmth_badly( const std::string & ) const
     return status_t::success;
 }
 
-status_t character_oracle_t::needs_water_badly( const std::string & ) const
+status_t character_oracle_t::needs_water_badly( std::string_view ) const
 {
+    // NO_NPC_FOOD disables thirst for NPCs.
+    if( !subject->needs_food() ) {
+        return status_t::success;
+    }
     // Check thirst threshold.
-    if( subject->get_thirst() > 520 ) {
+    if( subject->get_thirst() > npc_thirst_act_level ) {
         return status_t::running;
     }
     return status_t::success;
 }
 
-status_t character_oracle_t::needs_food_badly( const std::string & ) const
+status_t character_oracle_t::needs_food_badly( std::string_view ) const
 {
-    // Check hunger threshold.
-    if( subject->get_hunger() >= 300 && subject->get_starvation() > 2500 ) {
+    // NO_NPC_FOOD disables hunger for NPCs.
+    if( !subject->needs_food() ) {
+        return status_t::success;
+    }
+    // Short-term: stomach empty and actively starving.
+    if( subject->get_hunger() >= 300 && subject->get_starvation() > base_metabolic_rate ) {
+        return status_t::running;
+    }
+    // Long-term: short of calories, the same line where intake stops
+    if( calories_short( *subject ) ) {
         return status_t::running;
     }
     return status_t::success;
 }
 
-status_t character_oracle_t::can_wear_warmer_clothes( const std::string & ) const
+status_t character_oracle_t::can_wear_warmer_clothes( std::string_view ) const
 {
     // Check inventory for wearable warmer clothes, greedily.
     // Don't consider swapping clothes yet, just evaluate adding clothes.
@@ -59,51 +123,484 @@ status_t character_oracle_t::can_wear_warmer_clothes( const std::string & ) cons
     return found_clothes ? status_t::running : status_t::failure;
 }
 
-status_t character_oracle_t::can_make_fire( const std::string & ) const
+status_t character_oracle_t::can_make_fire( std::string_view ) const
 {
-    // Check inventory for firemaking tools and fuel
-    bool tool = false;
-    bool fuel = false;
-    bool found_fire_stuff = subject->has_item_with( [&tool, &fuel]( const item & candidate ) {
-        if( candidate.has_flag( flag_FIRESTARTER ) ) {
-            tool = true;
-            if( fuel ) {
-                return true;
-            }
-        } else if( candidate.flammable() ) {
-            fuel = true;
-            if( tool ) {
-                return true;
-            }
-        }
-        return false;
-    } );
-    return found_fire_stuff ? status_t::running : status_t::success;
+    // Delegate to npc::find_fire_spot() so the predicate and executor
+    // share the same viability policy (tool quality, tinder scope,
+    // fuel type, tile suitability).
+    const npc *n = dynamic_cast<const npc *>( subject );
+    if( !n ) {
+        return status_t::failure;
+    }
+    return const_cast<npc *>( n )->find_fire_spot().has_value()
+           ? status_t::running : status_t::failure;
 }
 
-status_t character_oracle_t::can_take_shelter( const std::string & ) const
+status_t character_oracle_t::can_take_shelter( std::string_view ) const
 {
-    // There be no shelter here.
-    // The frontline is everywhere.
+    // Delegate to npc::find_nearby_shelters() so oracle and action share
+    // the same detection logic (radius, LOS, passability, creature check).
+    const npc *n = dynamic_cast<const npc *>( subject );
+    if( !n ) {
+        return status_t::failure;
+    }
+    return n->find_nearby_shelters().empty() ? status_t::failure : status_t::running;
+}
+
+// carries an item it may consume for the need, and may stay put to consume it
+static bool carries_supply_for( const Character &subject, const npc::need_goal_id id )
+{
+    const npc *n = dynamic_cast<const npc *>( &subject );
+    if( !n || !n->intake_useful( id ) ) {
+        return false;
+    }
+    // meal or drink holds the NPC where it stands
+    if( !n->need_view( id, npc_option_cost::stay( n->pos_abs() ) ).may_consider() ) {
+        return false;
+    }
+    // const_cast: the inventory cache refreshes itself, so the query is not const
+    for( const item_location &loc : const_cast<npc *>( n )->cache_get_items_with( "is_food",
+            &item::is_food ) ) {
+        if( n->may_take( loc ) && n->can_satisfy( *loc, id ) ) {
+            return true;
+        }
+    }
+    return false;
+}
+
+status_t character_oracle_t::has_water( std::string_view ) const
+{
+    return carries_supply_for( *subject, npc::need_goal_id::drink_water ) ? status_t::running :
+           status_t::failure;
+}
+
+status_t character_oracle_t::has_food( std::string_view ) const
+{
+    return carries_supply_for( *subject, npc::need_goal_id::eat_food ) ? status_t::running :
+           status_t::failure;
+}
+
+status_t character_oracle_t::can_obtain_food( std::string_view ) const
+{
+    const npc *n = dynamic_cast<const npc *>( subject );
+    if( !n || !n->intake_useful( npc::need_goal_id::eat_food ) ) {
+        return status_t::failure;
+    }
+    // as in can_obtain_water(); const_cast: see npc::find_food_candidates()
+    for( const npc::need_candidate &c : const_cast<npc *>( n )->find_food_candidates() ) {
+        if( n->need_view( npc::need_goal_id::eat_food, n->food_option_cost( c ) ).may_consider() ) {
+            return status_t::running;
+        }
+    }
     return status_t::failure;
 }
 
-status_t character_oracle_t::has_water( const std::string & ) const
+status_t character_oracle_t::can_obtain_water( std::string_view ) const
 {
-    // Check if we know about water somewhere
-    bool found_water = subject->has_item_with( []( const item & cand ) {
-        return cand.is_food() && cand.get_comestible()->quench > 0;
-    } );
-    return found_water ? status_t::running : status_t::failure;
+    const npc *n = dynamic_cast<const npc *>( subject );
+    if( !n || !n->intake_useful( npc::need_goal_id::drink_water ) ) {
+        return status_t::failure;
+    }
+    // obligation check as in execute_drink_water; failed targets still count, since the
+    // executor retries them once every source has failed
+    // const_cast: see npc::find_food_candidates()
+    for( const npc::need_candidate &c : const_cast<npc *>( n )->find_water_candidates() ) {
+        if( n->need_view( npc::need_goal_id::drink_water, n->water_option_cost( c ) ).may_consider() ) {
+            return status_t::running;
+        }
+    }
+    return status_t::failure;
 }
 
-status_t character_oracle_t::has_food( const std::string & ) const
+status_t character_oracle_t::can_regulate_temperature( std::string_view ) const
 {
-    // Check if we know about food somewhere
-    bool found_food = subject->has_item_with( []( const item & cand ) {
-        return cand.is_food() && cand.get_comestible()->has_calories();
-    } );
-    return found_food ? status_t::running : status_t::failure;
+    const npc *n = dynamic_cast<const npc *>( subject );
+    if( !n ) {
+        return status_t::failure;
+    }
+    // Inventory wearable warmth: the executor handles this in step 1,
+    // but the predicate must detect it now that legacy
+    // can_wear_warmer_clothes is no longer a separate BT goal.
+    if( subject->has_item_with( [this]( const item & it ) {
+    return it.get_warmth() > 0 && subject->can_wear( it ).success() &&
+               !subject->is_worn( it );
+    } ) ) {
+        return status_t::running;
+    }
+    // const_cast: see npc::find_food_candidates()
+    if( !const_cast<npc *>( n )->find_temperature_candidates().empty() ) {
+        return status_t::running;
+    }
+    // Already indoors with no other warmth sources: the executor will
+    // hold position until warmth recovers. After the indoor hold
+    // timeout (60 turns without progress), stop returning running so
+    // the BT can assign follow/duty instead of holding forever.
+    if( get_map().has_flag( ter_furn_flag::TFLAG_INDOORS, n->pos_bub() ) &&
+        n->get_warmth_indoor_hold_turns() < 60 ) {
+        return status_t::running;
+    }
+    return status_t::failure;
+}
+
+status_t character_oracle_t::needs_sleep_badly( std::string_view ) const
+{
+    // TIRED (191): low enough that off-shift NPCs go to bed early.
+    // On-shift duty (0.45) easily beats sleep urgency at this level (0.191).
+    if( subject->get_sleepiness() >= static_cast<int>( sleepiness_levels::TIRED ) ) {
+        return status_t::running;
+    }
+    return status_t::success;
+}
+
+float character_oracle_t::thirst_urgency( std::string_view ) const
+{
+    if( !subject->needs_food() ) {
+        return 0.0f;
+    }
+    // 0 = hydrated, 1 = dehydration death (threshold 1200, character_health.cpp).
+    static constexpr float death_threshold = 1200.0f;
+    return std::clamp( subject->get_thirst() / death_threshold, 0.0f, 1.0f );
+}
+
+float character_oracle_t::hunger_urgency( std::string_view ) const
+{
+    if( !subject->needs_food() ) {
+        return 0.0f;
+    }
+    // 0 = healthy weight, 1 = starvation death (stored_kcal <= 0, character_health.cpp).
+    const int healthy = subject->get_healthy_kcal();
+    if( healthy <= 0 ) {
+        return 0.0f;
+    }
+    const float kcal_frac = static_cast<float>( subject->get_stored_kcal() ) / healthy;
+    return std::clamp( 1.0f - kcal_frac, 0.0f, 1.0f );
+}
+
+float character_oracle_t::temperature_urgency( std::string_view ) const
+{
+    // 0 = all bodyparts at BODYTEMP_NORM (37C),
+    // 1 = coldest bodypart at BODYTEMP_FREEZING (28C).
+    const float norm = units::to_kelvin( BODYTEMP_NORM );
+    const float freeze = units::to_kelvin( BODYTEMP_FREEZING );
+    const float range = norm - freeze;
+    if( range <= 0.0f ) {
+        return 0.0f;
+    }
+    float coldest = norm;
+    for( const bodypart_id &bp : subject->get_all_body_parts() ) {
+        const float temp = units::to_kelvin( subject->get_part_temp_conv( bp ) );
+        coldest = std::min( coldest, temp );
+    }
+    return std::clamp( ( norm - coldest ) / range, 0.0f, 1.0f );
+}
+
+status_t character_oracle_t::can_sleep( std::string_view ) const
+{
+    // CANNOT_SLEEP (meth, learning serum) is the body's only hard blocker.
+    // Stim, comfort, insomnia, and rng are soft score modifiers whose
+    // net effect depends on location and luck -- the oracle can't
+    // evaluate those without knowing where the NPC will sleep.
+    if( subject->has_flag( json_flag_CANNOT_SLEEP ) ) {
+        return status_t::failure;
+    }
+    if( subject->get_sleepiness() < static_cast<int>( sleepiness_levels::TIRED ) ) {
+        return status_t::failure;
+    }
+    if( const npc *n = dynamic_cast<const npc *>( subject ) ) {
+        // judged for the best spot inside the reach, never for a trip to the leader or
+        // post: a follower on a bed walled off from the leader may still sleep there
+        if( n->sleep_on_hold() || n->sleep_stalled() ||
+            !n->need_view( npc::need_goal_id::go_to_sleep, n->rest_option_best_case() ).may_consider() ) {
+            return status_t::failure;
+        }
+    }
+    return status_t::running;
+}
+
+float character_oracle_t::sleepiness_urgency( std::string_view ) const
+{
+    // 0 = rested, 1 = forced unconsciousness (MASSIVE_SLEEPINESS = 1000).
+    static constexpr float cap = 1000.0f;
+    return std::clamp( subject->get_sleepiness() / cap, 0.0f, 1.0f );
+}
+
+// Top-level decision predicates. These need NPC-specific state (ai_cache,
+// attitude) so they dynamic_cast from Character to npc.
+
+status_t character_oracle_t::in_danger( std::string_view ) const
+{
+    const npc *n = dynamic_cast<const npc *>( subject );
+    if( !n ) {
+        return status_t::failure;
+    }
+    return n->get_ai_danger() > 0 ? status_t::running : status_t::failure;
+}
+
+status_t character_oracle_t::should_flee( std::string_view ) const
+{
+    const npc *n = dynamic_cast<const npc *>( subject );
+    if( !n ) {
+        return status_t::failure;
+    }
+    if( n->has_effect( effect_npc_run_away ) ) {
+        return status_t::running;
+    }
+    if( n->get_attitude() == NPCATT_FLEE_TEMP ) {
+        return status_t::running;
+    }
+    return status_t::failure;
+}
+
+status_t character_oracle_t::has_target( std::string_view ) const
+{
+    const npc *n = dynamic_cast<const npc *>( subject );
+    if( !n ) {
+        return status_t::failure;
+    }
+    return n->get_ai_target().lock() ? status_t::running : status_t::failure;
+}
+
+status_t character_oracle_t::has_sound_alerts( std::string_view ) const
+{
+    const npc *n = dynamic_cast<const npc *>( subject );
+    if( !n ) {
+        return status_t::failure;
+    }
+    // Mirror the live cascade gates in npc::move() sound investigation:
+    // companions don't investigate, immobile NPCs can't investigate,
+    // IGNORE_SOUND NPCs treat sounds as non-actionable.
+    if( n->is_walking_with() || n->has_flag( json_flag_CANNOT_MOVE ) ||
+        n->has_trait( trait_IGNORE_SOUND ) ) {
+        return status_t::failure;
+    }
+    return n->has_ai_sound_alerts() ? status_t::running : status_t::failure;
+}
+
+status_t character_oracle_t::displaced_from_post( std::string_view ) const
+{
+    const npc *n = dynamic_cast<const npc *>( subject );
+    if( !n ) {
+        return status_t::failure;
+    }
+    if( n->has_flag( json_flag_CANNOT_MOVE ) ) {
+        return status_t::failure;
+    }
+    if( n->is_walking_with() ) {
+        return status_t::failure;
+    }
+    std::optional<tripoint_abs_ms> gp = n->get_guard_post();
+    if( !gp ) {
+        return status_t::failure;
+    }
+    return n->pos_abs() != *gp ? status_t::running : status_t::failure;
+}
+
+status_t character_oracle_t::on_shift( std::string_view ) const
+{
+    const npc *n = dynamic_cast<const npc *>( subject );
+    return n && n->is_on_shift() ? status_t::running : status_t::failure;
+}
+
+float character_oracle_t::duty_urgency( std::string_view ) const
+{
+    const npc *n = dynamic_cast<const npc *>( subject );
+    if( !n ) {
+        return 0.0f;
+    }
+    std::optional<tripoint_abs_ms> gp = n->get_guard_post();
+    if( !gp || !n->myclass.is_valid() ) {
+        return 0.0f;
+    }
+    if( n->is_walking_with() ) {
+        return 0.0f;
+    }
+    const bool on = n->is_on_shift();
+
+    if( n->pos_abs() == *gp ) {
+        // At post: on-shift returns a baseline that resists moderate
+        // tiredness. Off-shift returns 0 so needs (sleep) can win.
+        return on ? 0.45f : 0.0f;
+    }
+    // Off-shift: no duty pull at all. Guard stays where they are
+    // (bed, shelter, wherever) until their shift starts.
+    if( !on ) {
+        return 0.0f;
+    }
+    // Displaced on-shift: distance-based with a floor so the NPC
+    // strongly prefers returning even when close to post.
+    const int dist = rl_dist( n->pos_abs(), *gp );
+    return std::max( 0.45f, std::min( 0.5f, dist * 0.05f ) );
+}
+
+status_t character_oracle_t::npc_is_following( std::string_view ) const
+{
+    const npc *n = dynamic_cast<const npc *>( subject );
+    if( !n || !n->can_follow_player_now() ) {
+        return status_t::failure;
+    }
+    // Wait until the player parks; don't path into a moving vehicle.
+    if( player_moving_vehicle() ) {
+        return status_t::failure;
+    }
+    const Character &player = get_player_character();
+    const int dist = rl_dist( n->pos_abs(), player.pos_abs() );
+    if( dist <= n->desired_follow_radius() && n->posz() == player.posz() ) {
+        return status_t::success;
+    }
+    return status_t::running;
+}
+
+float character_oracle_t::npc_following_urgency( std::string_view ) const
+{
+    const npc *n = dynamic_cast<const npc *>( subject );
+    if( !n || !n->can_follow_player_now() ) {
+        return 0.0f;
+    }
+    if( player_moving_vehicle() ) {
+        return 0.0f;
+    }
+    const Character &player = get_player_character();
+    if( n->posz() != player.posz() ) {
+        return 0.6f;
+    }
+    const int dist = rl_dist( n->pos_abs(), player.pos_abs() );
+    const int radius = n->desired_follow_radius();
+    if( dist <= radius ) {
+        return 0.0f;
+    }
+    return std::clamp( 0.3f + ( dist - radius ) * 0.015f, 0.3f, 0.6f );
+}
+
+status_t character_oracle_t::npc_should_embark( std::string_view ) const
+{
+    const npc *n = dynamic_cast<const npc *>( subject );
+    if( !n || !n->is_walking_with() || n->has_flag( json_flag_CANNOT_MOVE ) ) {
+        return status_t::failure;
+    }
+    const Character &player = get_player_character();
+    if( !player.in_vehicle ) {
+        return status_t::failure;
+    }
+    // Boarding a moving vehicle is impossible; wait for the player to stop.
+    if( player_moving_vehicle() ) {
+        return status_t::failure;
+    }
+    // Stays running once the NPC is in the vehicle: the action handler
+    // routes them to a real seat (or pauses when already seated).
+    return status_t::running;
+}
+
+float character_oracle_t::npc_embark_urgency( std::string_view ) const
+{
+    if( npc_should_embark( "" ) != status_t::running ) {
+        return 0.0f;
+    }
+    // already on a belted seat or bed: low enough that a tired passenger sleeps
+    const npc *n = dynamic_cast<const npc *>( subject );
+    if( n != nullptr && n->in_vehicle_bed() ) {
+        return 0.15f;
+    }
+    return 0.6f;
+}
+
+status_t character_oracle_t::npc_has_goto_order( std::string_view ) const
+{
+    const npc *n = dynamic_cast<const npc *>( subject );
+    if( !n || !n->goto_to_this_pos || n->has_flag( json_flag_CANNOT_MOVE ) ) {
+        return status_t::failure;
+    }
+    if( n->pos_abs() == *n->goto_to_this_pos ) {
+        return status_t::success;
+    }
+    return status_t::running;
+}
+
+float character_oracle_t::npc_goto_order_urgency( std::string_view ) const
+{
+    const npc *n = dynamic_cast<const npc *>( subject );
+    if( !n || !n->goto_to_this_pos ) {
+        return 0.0f;
+    }
+    if( n->pos_abs() == *n->goto_to_this_pos ) {
+        return 0.0f;
+    }
+    // Player-directed order. Beats generic follow (capped at 0.6)
+    // but loses to life-threatening needs (thirst at 0.75+).
+    return 0.65f;
+}
+
+status_t character_oracle_t::has_camp_job( std::string_view ) const
+{
+    const npc *n = dynamic_cast<const npc *>( subject );
+    if( !n || !n->assigned_camp || n->mission != NPC_MISSION_CAMP_RESIDENT ) {
+        return status_t::failure;
+    }
+    if( !npc_within_camp( *n ) ) {
+        return status_t::failure;
+    }
+    if( !n->has_job() ) {
+        return status_t::failure;
+    }
+    if( calendar::turn - n->last_job_scan < 10_minutes ) {
+        return status_t::failure;
+    }
+    return status_t::running;
+}
+
+status_t character_oracle_t::is_away_from_camp( std::string_view ) const
+{
+    const npc *n = dynamic_cast<const npc *>( subject );
+    if( !n || !n->assigned_camp || n->mission != NPC_MISSION_CAMP_RESIDENT ) {
+        return status_t::failure;
+    }
+    return npc_within_camp( *n ) ? status_t::failure : status_t::running;
+}
+
+status_t character_oracle_t::is_camp_idle( std::string_view ) const
+{
+    const npc *n = dynamic_cast<const npc *>( subject );
+    if( !n || !n->assigned_camp || n->mission != NPC_MISSION_CAMP_RESIDENT ) {
+        return status_t::failure;
+    }
+    if( n->get_attitude() == NPCATT_ACTIVITY ) {
+        return status_t::failure;
+    }
+    if( !npc_within_camp( *n ) ) {
+        return status_t::failure;
+    }
+    return status_t::running;
+}
+
+float character_oracle_t::camp_work_urgency( std::string_view ) const
+{
+    const npc *n = dynamic_cast<const npc *>( subject );
+    if( !n || !n->assigned_camp || n->mission != NPC_MISSION_CAMP_RESIDENT
+        || !npc_within_camp( *n ) || !n->has_job() ) {
+        return 0.0f;
+    }
+    return 0.4f;
+}
+
+float character_oracle_t::return_to_camp_urgency( std::string_view ) const
+{
+    const npc *n = dynamic_cast<const npc *>( subject );
+    if( !n || !n->assigned_camp || n->mission != NPC_MISSION_CAMP_RESIDENT
+        || npc_within_camp( *n ) ) {
+        return 0.0f;
+    }
+    // Below follow max (0.6), above duty (0.45).
+    return 0.5f;
+}
+
+float character_oracle_t::free_time_urgency( std::string_view ) const
+{
+    const npc *n = dynamic_cast<const npc *>( subject );
+    if( !n || !n->assigned_camp || n->mission != NPC_MISSION_CAMP_RESIDENT
+        || n->get_attitude() == NPCATT_ACTIVITY
+        || !npc_within_camp( *n ) ) {
+        return 0.0f;
+    }
+    return 0.35f;
 }
 
 } // namespace behavior

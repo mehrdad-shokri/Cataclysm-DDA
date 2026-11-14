@@ -1,0 +1,17 @@
+[
+  {
+    "type": "effect_type",
+    "id": "effect_magiclysm_spellcasting_aid_item_wielded",
+    "//": "Hidden effect, used since item flags can't be detected by jmath",
+    "name": [ "" ],
+    "desc": [ "" ]
+  },
+  {
+    "type": "effect_type",
+    "id": "effect_magiclysm_bruise_immune",
+    "//": "Hidden effect, used since item flags aren't character flags",
+    "name": [ "" ],
+    "desc": [ "" ],
+    "flags": [ "BRUISE_IMMUNE" ]
+  }
+]

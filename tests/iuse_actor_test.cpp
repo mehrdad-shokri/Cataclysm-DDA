@@ -1,40 +1,112 @@
-#include "catch/catch.hpp"
-
+#include <algorithm>
+#include <functional>
 #include <list>
+#include <map>
 #include <memory>
+#include <optional>
+#include <string>
+#include <utility>
 
 #include "avatar.h"
+#include "calendar.h"
+#include "cata_catch.h"
+#include "cata_scope_helpers.h"
+#include "character.h"
+#include "clzones.h"
+#include "coordinates.h"
+#include "creature_tracker.h"
 #include "game.h"
-#include "inventory.h"
 #include "item.h"
+#include "item_location.h"
+#include "itype.h"
+#include "iuse.h"
+#include "iuse_actor.h"
+#include "map.h"
+#include "map_helpers.h"
+#include "map_selector.h"
+#include "material.h"
 #include "monster.h"
 #include "mtype.h"
-#include "pimpl.h"
-#include "player.h"
+#include "player_helpers.h"
+#include "pocket_type.h"
 #include "point.h"
+#include "ret_val.h"
+#include "skill.h"
 #include "type_id.h"
+#include "units.h"
 
-static player &get_sanitized_player( )
+static const ammotype ammo_battery( "battery" );
+
+static const furn_str_id furn_f_firering( "f_firering" );
+
+static const itype_id itype_acidchitin_harness_dog( "acidchitin_harness_dog" );
+static const itype_id itype_backpack_hiking( "backpack_hiking" );
+static const itype_id itype_beartrap( "beartrap" );
+static const itype_id itype_blanket( "blanket" );
+static const itype_id itype_bot_manhack( "bot_manhack" );
+static const itype_id itype_boxpack( "boxpack" );
+static const itype_id itype_bunker_coat( "bunker_coat" );
+static const itype_id itype_bunker_pants( "bunker_pants" );
+static const itype_id itype_burette( "burette" );
+static const itype_id itype_caltrops( "caltrops" );
+static const itype_id itype_camera( "camera" );
+static const itype_id itype_case_violin( "case_violin" );
+static const itype_id itype_cell_phone( "cell_phone" );
+static const itype_id itype_chitin_harness_dog( "chitin_harness_dog" );
+static const itype_id itype_down_mattress( "down_mattress" );
+static const itype_id itype_dress_wedding( "dress_wedding" );
+static const itype_id itype_eink_tablet_pc( "eink_tablet_pc" );
+static const itype_id itype_flashlight( "flashlight" );
+static const itype_id itype_funnel( "funnel" );
+static const itype_id itype_kevlar_harness( "kevlar_harness" );
+static const itype_id itype_knife_huge( "knife_huge" );
+static const itype_id itype_laptop( "laptop" );
+static const itype_id itype_leather_harness_dog( "leather_harness_dog" );
+static const itype_id itype_leatherbone_harness_dog( "leatherbone_harness_dog" );
+static const itype_id itype_log( "log" );
+static const itype_id itype_medium_battery_cell( "medium_battery_cell" );
+static const itype_id itype_peacoat( "peacoat" );
+static const itype_id itype_plastic_boat_hull( "plastic_boat_hull" );
+static const itype_id itype_radio( "radio" );
+static const itype_id itype_rubber_harness_dog( "rubber_harness_dog" );
+static const itype_id itype_stick( "stick" );
+static const itype_id itype_stick_long( "stick_long" );
+static const itype_id itype_tazer( "tazer" );
+static const itype_id itype_test_transform_baton( "test_transform_baton" );
+static const itype_id itype_test_transform_baton_long( "test_transform_baton_long" );
+static const itype_id itype_test_transform_long_pack( "test_transform_long_pack" );
+static const itype_id itype_test_transform_short_vest( "test_transform_short_vest" );
+static const itype_id itype_test_transform_timed_baton( "test_transform_timed_baton" );
+static const itype_id itype_touring_suit( "touring_suit" );
+static const itype_id itype_under_armor( "under_armor" );
+static const itype_id itype_voltmeter( "voltmeter" );
+static const itype_id itype_wetsuit( "wetsuit" );
+static const itype_id itype_wetsuit_booties( "wetsuit_booties" );
+static const itype_id itype_wetsuit_gloves( "wetsuit_gloves" );
+static const itype_id itype_wetsuit_hood( "wetsuit_hood" );
+static const itype_id itype_wetsuit_spring( "wetsuit_spring" );
+
+static const mtype_id mon_manhack( "mon_manhack" );
+
+static const proficiency_id proficiency_prof_traps( "prof_traps" );
+static const proficiency_id proficiency_prof_trapsetting( "prof_trapsetting" );
+
+static const skill_id skill_traps( "traps" );
+
+static const trap_str_id tr_firewood_source( "tr_firewood_source" );
+
+static const zone_type_id zone_type_SOURCE_FIREWOOD( "SOURCE_FIREWOOD" );
+
+static monster *find_adjacent_monster( const tripoint_bub_ms &pos )
 {
-    avatar &player_character = get_avatar();
-    // Remove first worn item until there are none left.
-    std::list<item> temp;
-    while( player_character.takeoff( player_character.i_at( -2 ), &temp ) ) {}
-    player_character.inv->clear();
-    player_character.remove_weapon();
-
-    return player_character;
-}
-
-static monster *find_adjacent_monster( const tripoint &pos )
-{
-    tripoint target = pos;
-    for( target.x = pos.x - 1; target.x <= pos.x + 1; target.x++ ) {
-        for( target.y = pos.y - 1; target.y <= pos.y + 1; target.y++ ) {
+    tripoint_bub_ms target = pos;
+    creature_tracker &creatures = get_creature_tracker();
+    for( target.x() = pos.x() - 1; target.x() <= pos.x() + 1; target.x()++ ) {
+        for( target.y() = pos.y() - 1; target.y() <= pos.y() + 1; target.y()++ ) {
             if( target == pos ) {
                 continue;
             }
-            if( monster *const candidate = g->critter_at<monster>( target ) ) {
+            if( monster *const candidate = creatures.creature_at<monster>( target ) ) {
                 return candidate;
             }
         }
@@ -44,25 +116,375 @@ static monster *find_adjacent_monster( const tripoint &pos )
 
 TEST_CASE( "manhack", "[iuse_actor][manhack]" )
 {
-    player &player_character = get_sanitized_player();
+    clear_avatar();
+    Character &player_character = get_avatar();
+    clear_map_without_vision();
 
     g->clear_zombies();
-    item &test_item = player_character.i_add( item( "bot_manhack", 0, item::default_charges_tag{} ) );
+    item_location test_item = player_character.i_add( item( itype_bot_manhack, calendar::turn_zero,
+                              item::default_charges_tag{} ) );
 
-    REQUIRE( player_character.has_item( test_item ) );
+    REQUIRE( player_character.has_item( *test_item ) );
 
-    monster *new_manhack = find_adjacent_monster( player_character.pos() );
+    monster *new_manhack = find_adjacent_monster( player_character.pos_bub() );
     REQUIRE( new_manhack == nullptr );
 
-    player_character.invoke_item( &test_item );
+    player_character.invoke_item( &*test_item );
 
     REQUIRE( !player_character.has_item_with( []( const item & it ) {
-        return it.typeId() == itype_id( "bot_manhack" );
+        return it.typeId() == itype_bot_manhack;
     } ) );
 
-    new_manhack = find_adjacent_monster( player_character.pos() );
+    new_manhack = find_adjacent_monster( player_character.pos_bub() );
     REQUIRE( new_manhack != nullptr );
-    REQUIRE( new_manhack->type->id == mtype_id( "mon_manhack" ) );
+    REQUIRE( new_manhack->type->id == mon_manhack );
     g->clear_zombies();
 }
 
+TEST_CASE( "tool_transform_when_activated", "[iuse][tool][transform]" )
+{
+    Character *dummy = &get_avatar();
+    clear_avatar();
+
+    GIVEN( "flashlight with a charged battery installed" ) {
+        item flashlight( itype_flashlight );
+        item bat_cell( itype_medium_battery_cell );
+        REQUIRE( flashlight.can_reload_with( item( itype_medium_battery_cell ), true ) );
+
+        // Charge the battery
+        const int bat_charges = bat_cell.ammo_capacity( ammo_battery );
+        bat_cell.ammo_set( bat_cell.ammo_default(), bat_charges );
+        REQUIRE( bat_cell.ammo_remaining( ) == bat_charges );
+
+        // Put battery in flashlight
+        REQUIRE( flashlight.has_pocket_type( pocket_type::MAGAZINE_WELL ) );
+        ret_val<void> result = flashlight.put_in( bat_cell, pocket_type::MAGAZINE_WELL );
+        REQUIRE( result.success() );
+        REQUIRE( flashlight.magazine_current() );
+
+        WHEN( "flashlight is turned on" ) {
+            // Activation occurs via the iuse_transform actor
+            const use_function *use = flashlight.type->get_use( "transform" );
+            REQUIRE( use != nullptr );
+            const iuse_transform *actor = dynamic_cast<const iuse_transform *>( use->get_actor_ptr() );
+            actor->use( dummy, flashlight, &get_map(), dummy->pos_bub() );
+
+            THEN( "it becomes active" ) {
+                CHECK( flashlight.active );
+            }
+            THEN( "the battery remains installed" ) {
+                CHECK( flashlight.magazine_current() );
+            }
+            THEN( "name indicates (on) status" ) {
+                CHECK( flashlight.tname() == "flashlight (on)" );
+            }
+        }
+    }
+}
+
+TEST_CASE( "transform_blocked_when_result_too_long_for_parent_pocket",
+           "[iuse_actor][transform][pocket]" )
+{
+    Character &dummy = get_avatar();
+    clear_avatar();
+
+    // Vest has a single 30 cm pocket; the test baton extends from 24 cm to 60 cm.
+    item baton( itype_test_transform_baton );
+    REQUIRE( baton.length() <= 30_cm );
+    REQUIRE( item( itype_test_transform_baton_long ).length() > 30_cm );
+
+    GIVEN( "a baton stashed in a pocket too small for the extended form" ) {
+        item vest( itype_test_transform_short_vest );
+        REQUIRE( vest.put_in( baton, pocket_type::CONTAINER ).success() );
+        auto vest_iter = dummy.wear_item( vest, false, false );
+        REQUIRE( vest_iter.has_value() );
+        item &worn_vest = **vest_iter;
+        item &stashed_baton = worn_vest.only_item();
+        REQUIRE( dummy.has_item( stashed_baton ) );
+
+        const use_function *use = stashed_baton.type->get_use( "transform" );
+        REQUIRE( use != nullptr );
+        const iuse_transform *actor = dynamic_cast<const iuse_transform *>
+                                      ( use->get_actor_ptr() );
+        REQUIRE( actor != nullptr );
+
+        WHEN( "checking if the transform can be invoked" ) {
+            ret_val<void> can = actor->can_use( dummy, stashed_baton, &get_map(),
+                                                dummy.pos_bub() );
+            THEN( "the transform is rejected" ) {
+                CHECK_FALSE( can.success() );
+            }
+        }
+
+        WHEN( "the player tries to invoke the transform" ) {
+            dummy.invoke_item( &stashed_baton );
+            THEN( "the baton is not transformed" ) {
+                CHECK( stashed_baton.typeId() == itype_test_transform_baton );
+                CHECK( worn_vest.only_item().typeId() == itype_test_transform_baton );
+            }
+        }
+    }
+
+    GIVEN( "a baton stashed in a pocket large enough for the extended form" ) {
+        item bag( itype_test_transform_long_pack );
+        REQUIRE( bag.put_in( baton, pocket_type::CONTAINER ).success() );
+        auto bag_iter = dummy.wear_item( bag, false, false );
+        REQUIRE( bag_iter.has_value() );
+        item &worn_bag = **bag_iter;
+        item &stashed_baton = worn_bag.only_item();
+        REQUIRE( dummy.has_item( stashed_baton ) );
+
+        const use_function *use = stashed_baton.type->get_use( "transform" );
+        REQUIRE( use != nullptr );
+        const iuse_transform *actor = dynamic_cast<const iuse_transform *>
+                                      ( use->get_actor_ptr() );
+        REQUIRE( actor != nullptr );
+
+        WHEN( "checking if the transform can be invoked" ) {
+            ret_val<void> can = actor->can_use( dummy, stashed_baton, &get_map(),
+                                                dummy.pos_bub() );
+            THEN( "the transform is allowed" ) {
+                CHECK( can.success() );
+            }
+        }
+    }
+}
+
+TEST_CASE( "timed_transform_spills_oversize_result_out_of_parent_pocket",
+           "[iuse_actor][transform][pocket]" )
+{
+    clear_map();
+    Character &dummy = get_avatar();
+    clear_avatar();
+
+    GIVEN( "a timed-transform baton stashed in a pocket too small for the result" ) {
+        item vest( itype_test_transform_short_vest );
+        REQUIRE( vest.put_in( item( itype_test_transform_timed_baton ),
+                              pocket_type::CONTAINER ).success() );
+        auto vest_iter = dummy.wear_item( vest, false, false );
+        REQUIRE( vest_iter.has_value() );
+        item &worn_vest = **vest_iter;
+        item &stashed_baton = worn_vest.only_item();
+        REQUIRE( dummy.has_item( stashed_baton ) );
+
+        WHEN( "the countdown fires and the inventory is reconciled" ) {
+            stashed_baton.active = true;
+            stashed_baton.countdown_point = calendar::turn - 1_seconds;
+            stashed_baton.process( get_map(), &dummy, dummy.pos_bub() );
+            dummy.drop_invalid_inventory();
+            THEN( "the extended baton has spilled out onto the ground" ) {
+                CHECK( worn_vest.empty_container() );
+                bool spilled_to_ground = false;
+                for( const item &i : get_map().i_at( dummy.pos_bub() ) ) {
+                    if( i.typeId() == itype_test_transform_baton_long ) {
+                        spilled_to_ground = true;
+                        break;
+                    }
+                }
+                CHECK( spilled_to_ground );
+            }
+        }
+    }
+
+    GIVEN( "a timed-transform baton stashed in a pocket large enough for the result" ) {
+        item bag( itype_test_transform_long_pack );
+        REQUIRE( bag.put_in( item( itype_test_transform_timed_baton ),
+                             pocket_type::CONTAINER ).success() );
+        auto bag_iter = dummy.wear_item( bag, false, false );
+        REQUIRE( bag_iter.has_value() );
+        item &worn_bag = **bag_iter;
+        item &stashed_baton = worn_bag.only_item();
+        REQUIRE( dummy.has_item( stashed_baton ) );
+
+        WHEN( "the countdown fires and the inventory is reconciled" ) {
+            stashed_baton.active = true;
+            stashed_baton.countdown_point = calendar::turn - 1_seconds;
+            stashed_baton.process( get_map(), &dummy, dummy.pos_bub() );
+            dummy.drop_invalid_inventory();
+            THEN( "the extended baton stays in the pocket" ) {
+                REQUIRE_FALSE( worn_bag.empty_container() );
+                CHECK( worn_bag.only_item().typeId() == itype_test_transform_baton_long );
+            }
+        }
+    }
+}
+
+static void cut_up_yields( const itype_id &target )
+{
+    map &here = get_map();
+    Character &guy = get_avatar();
+    clear_avatar();
+    // Nominal dex to avoid yield penalty.
+    guy.set_dex_base( 12 );
+    //guy.set_skill_level( skill_id( "fabrication" ), 10 );
+    here.i_at( guy.pos_bub() ).clear();
+
+    CAPTURE( target.c_str() );
+    salvage_actor test_actor;
+    item cut_up_target( target );
+    item tool( itype_knife_huge );
+    const std::map<material_id, int> &target_materials = cut_up_target.made_of();
+    const float mat_total = cut_up_target.type->mat_portion_total == 0 ? 1 :
+                            cut_up_target.type->mat_portion_total;
+    units::mass smallest_yield_mass = units::mass::max();
+    for( const auto &mater : target_materials ) {
+        if( const std::optional<itype_id> item_id = mater.first->salvaged_into() ) {
+            units::mass portioned_weight = item_id->obj().weight * ( mater.second / mat_total );
+            smallest_yield_mass = std::min( smallest_yield_mass, portioned_weight );
+        }
+    }
+    REQUIRE( smallest_yield_mass != units::mass::max() );
+
+    units::mass cut_up_target_mass = cut_up_target.weight();
+    item &spawned_item = here.add_item_or_charges( guy.pos_bub(), cut_up_target );
+    item_location item_loc( map_cursor( guy.pos_abs() ), &spawned_item );
+
+    REQUIRE( smallest_yield_mass <= cut_up_target_mass );
+
+    test_actor.try_to_cut_up( guy, tool, item_loc );
+
+    map_stack salvaged_items = here.i_at( guy.pos_bub() );
+    units::mass salvaged_mass = 0_gram;
+    for( const item &salvage : salvaged_items ) {
+        salvaged_mass += salvage.weight();
+    }
+    CHECK( salvaged_mass <= cut_up_target_mass );
+}
+
+TEST_CASE( "cut_up_yields" )
+{
+    cut_up_yields( itype_blanket );
+    cut_up_yields( itype_backpack_hiking );
+    cut_up_yields( itype_boxpack );
+    cut_up_yields( itype_case_violin );
+    cut_up_yields( itype_down_mattress );
+    cut_up_yields( itype_plastic_boat_hull );
+    cut_up_yields( itype_bunker_coat );
+    cut_up_yields( itype_bunker_pants );
+    cut_up_yields( itype_kevlar_harness );
+    cut_up_yields( itype_touring_suit );
+    cut_up_yields( itype_dress_wedding );
+    cut_up_yields( itype_wetsuit );
+    cut_up_yields( itype_wetsuit_booties );
+    cut_up_yields( itype_wetsuit_hood );
+    cut_up_yields( itype_wetsuit_spring );
+    cut_up_yields( itype_wetsuit_gloves );
+    cut_up_yields( itype_peacoat );
+    cut_up_yields( itype_log );
+    cut_up_yields( itype_stick );
+    cut_up_yields( itype_stick_long );
+    cut_up_yields( itype_tazer );
+    cut_up_yields( itype_laptop );
+    cut_up_yields( itype_voltmeter );
+    cut_up_yields( itype_burette );
+    cut_up_yields( itype_eink_tablet_pc );
+    cut_up_yields( itype_camera );
+    cut_up_yields( itype_cell_phone );
+    cut_up_yields( itype_laptop );
+    cut_up_yields( itype_radio );
+    cut_up_yields( itype_under_armor );
+    cut_up_yields( itype_acidchitin_harness_dog );
+    cut_up_yields( itype_chitin_harness_dog );
+    cut_up_yields( itype_leather_harness_dog );
+    cut_up_yields( itype_leatherbone_harness_dog );
+    cut_up_yields( itype_kevlar_harness );
+    cut_up_yields( itype_rubber_harness_dog );
+}
+
+static const place_trap_actor &place_trap_actor_of( const itype_id &id )
+{
+    const use_function *use = id->get_use( "place_trap" );
+    REQUIRE( use != nullptr );
+    const place_trap_actor *actor = dynamic_cast<const place_trap_actor *>( use->get_actor_ptr() );
+    REQUIRE( actor != nullptr );
+    return *actor;
+}
+
+TEST_CASE( "place_trap_move_cost_scales_with_skill_and_proficiencies", "[iuse_actor][trap]" )
+{
+    clear_avatar();
+    Character &dummy = get_avatar();
+
+    GIVEN( "no traps skill" ) {
+        WHEN( "has neither trap proficiency" ) {
+            THEN( "cost is JSON moves times eight for every practice value" ) {
+                // practice: funnel 0, caltrops 2, beartrap 4
+                CHECK( place_trap_actor_of( itype_funnel ).unburied_data.move_cost( dummy ) == 800 );
+                CHECK( place_trap_actor_of( itype_caltrops ).unburied_data.move_cost( dummy ) == 1200 );
+                CHECK( place_trap_actor_of( itype_beartrap ).unburied_data.move_cost( dummy ) == 1600 );
+            }
+        }
+        WHEN( "only has prof_traps" ) {
+            dummy.add_proficiency( proficiency_prof_traps, true );
+            THEN( "only trapsetting penalty of two applies" ) {
+                CHECK( place_trap_actor_of( itype_beartrap ).unburied_data.move_cost( dummy ) == 400 );
+            }
+        }
+        WHEN( "only has prof_trapsetting" ) {
+            dummy.add_proficiency( proficiency_prof_trapsetting, true );
+            THEN( "only traps penalty of four applies" ) {
+                CHECK( place_trap_actor_of( itype_beartrap ).unburied_data.move_cost( dummy ) == 800 );
+            }
+        }
+    }
+
+    GIVEN( "both trap proficiencies and a fractional traps skill" ) {
+        dummy.add_proficiency( proficiency_prof_traps, true );
+        dummy.add_proficiency( proficiency_prof_trapsetting, true );
+        dummy.set_skill_level( skill_traps, 1 );
+
+        WHEN( "skill 1.5, trap practice 0" ) {
+            dummy.get_skill_level_object( skill_traps ).set_exercise( 50 );
+            REQUIRE( dummy.get_skill_level( skill_traps ) == Approx( 1.5f ) );
+            THEN( "cost is JSON moves / skill rounded to nearest" ) {
+                // 100 / 1.5 = 66.67, round 67, trunc 66
+                CHECK( place_trap_actor_of( itype_funnel ).unburied_data.move_cost( dummy ) == 67 );
+            }
+        }
+        WHEN( "skill 1.75, trap practice 2" ) {
+            dummy.get_skill_level_object( skill_traps ).set_exercise( 75 );
+            REQUIRE( dummy.get_skill_level( skill_traps ) == Approx( 1.75f ) );
+            THEN( "cost is JSON moves / skill rounded to nearest" ) {
+                // 150 / 1.75 = 85.71, round 86, trunc 85
+                CHECK( place_trap_actor_of( itype_caltrops ).unburied_data.move_cost( dummy ) == 86 );
+            }
+        }
+    }
+}
+
+// tests answer every query_yn with no: query_popup::query_once returns "ERROR" in test_mode
+TEST_CASE( "firestarter_asks_before_burning_a_firewood_source", "[iuse_actor][fire]" )
+{
+    clear_map_without_vision();
+    clear_avatar();
+    avatar &u = get_avatar();
+    map &here = get_map();
+    tripoint_bub_ms ring = u.pos_bub() + point::east;
+    here.furn_set( ring, furn_f_firering );
+
+    SECTION( "a plain fire ring is lit without a question" ) {
+        CHECK_FALSE( firestarter_actor::is_firewood_source( here, ring ) );
+        CHECK( firestarter_actor::prep_firestarter_use( u, &here, ring ) ==
+               firestarter_actor::start_type::FIRE );
+    }
+    SECTION( "firewood source trap asks first, no keeps it unlit" ) {
+        here.trap_set( ring, tr_firewood_source );
+        CHECK( firestarter_actor::is_firewood_source( here, ring ) );
+        CHECK( firestarter_actor::prep_firestarter_use( u, &here, ring ) ==
+               firestarter_actor::start_type::NONE );
+    }
+    SECTION( "firewood source zone asks first, no keeps it unlit" ) {
+        zone_manager &mgr = zone_manager::get_manager();
+        on_out_of_scope clear_zones( [&mgr]() {
+            mgr.clear();
+            mgr.cache_data();
+        } );
+        const tripoint_abs_ms ring_abs = here.get_abs( ring );
+        mgr.add( "test_firewood", zone_type_SOURCE_FIREWOOD, your_fac, false, true, ring_abs,
+                 ring_abs );
+        mgr.cache_data();
+        CHECK( firestarter_actor::is_firewood_source( here, ring ) );
+        CHECK( firestarter_actor::prep_firestarter_use( u, &here, ring ) ==
+               firestarter_actor::start_type::NONE );
+    }
+}

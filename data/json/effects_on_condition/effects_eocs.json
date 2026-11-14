@@ -1,0 +1,309 @@
+[
+  {
+    "type": "effect_on_condition",
+    "id": "bad_food_mood_debuff",
+    "recurrence": [ "1 hours", "2 hours" ],
+    "condition": { "u_has_effect": "bad_food_ennui" },
+    "//": "duration doesn't matter, since morale is added every hour, therefore it will always be mismatched with bad_food_ennui; instead, if you loose bad_food_ennui effect, you will lost the mood debuff also",
+    "effect": [
+      {
+        "u_add_morale": "morale_bad_protein_bar",
+        "bonus": { "math": [ "u_vitamin('bad_food') / -10" ] },
+        "max_bonus": { "math": [ "u_vitamin('bad_food') / -4" ] },
+        "duration": "1 days",
+        "decay_start": "1 days"
+      }
+    ],
+    "false_effect": [ { "u_lose_morale": "morale_bad_protein_bar" } ]
+  },
+  {
+    "type": "effect_on_condition",
+    "id": "eoc_social_satisfied",
+    "recurrence": [ "1 minutes", "5 minutes" ],
+    "condition": { "u_has_effect": "social_satisfied" },
+    "effect": [ { "u_add_morale": "morale_social", "bonus": 6, "max_bonus": 6, "duration": "1 days", "decay_start": "1 days" } ],
+    "false_effect": [ { "u_lose_morale": "morale_social" } ]
+  },
+  {
+    "type": "effect_on_condition",
+    "id": "eoc_social_dissatisfied",
+    "recurrence": [ "1 minutes", "5 minutes" ],
+    "condition": { "u_has_effect": "social_dissatisfied" },
+    "effect": [
+      {
+        "u_add_morale": "morale_asocial",
+        "bonus": { "math": [ "u_effect_intensity('social_dissatisfied') * -7" ] },
+        "max_bonus": -21,
+        "duration": "1 days",
+        "decay_start": "1 days"
+      }
+    ],
+    "false_effect": [ { "u_lose_morale": "morale_social_dissatisfied" } ]
+  },
+  {
+    "type": "effect_on_condition",
+    "id": "eoc_asocial_satisfied",
+    "recurrence": [ "1 minutes", "5 minutes" ],
+    "condition": { "u_has_effect": "asocial_satisfied" },
+    "effect": [ { "u_add_morale": "morale_asocial", "bonus": 10, "max_bonus": 10, "duration": "1 days", "decay_start": "1 days" } ],
+    "false_effect": [ { "u_lose_morale": "morale_asocial" } ]
+  },
+  {
+    "type": "effect_on_condition",
+    "id": "eoc_asocial_dissatisfied",
+    "recurrence": [ "1 minutes", "5 minutes" ],
+    "condition": { "u_has_effect": "asocial_dissatisfied" },
+    "effect": [
+      {
+        "u_add_morale": "morale_social",
+        "bonus": { "math": [ "u_effect_intensity('asocial_dissatisfied') * -7" ] },
+        "max_bonus": -21,
+        "duration": "1 days",
+        "decay_start": "1 days"
+      }
+    ],
+    "false_effect": [ { "u_lose_morale": "morale_asocial_dissatisfied" } ]
+  },
+  {
+    "type": "effect_on_condition",
+    "id": "eoc_conjunctivitis_sting",
+    "recurrence": [ "45 minutes", "120 minutes" ],
+    "condition": { "and": [ { "u_has_effect": "conjunctivitis", "bodypart": "eyes" }, { "not": { "u_has_effect": "sleep" } } ] },
+    "effect": [
+      {
+        "u_add_effect": "smoke_eyes",
+        "duration": 300,
+        "intensity": { "math": [ "u_effect_intensity('smoke_eyes', 'bodypart': 'eyes') + 1" ] },
+        "target_part": "eyes"
+      }
+    ]
+  },
+  {
+    "type": "effect_on_condition",
+    "id": "EOC_dermatik_visible_INIT",
+    "eoc_type": "EVENT",
+    "required_event": "character_gains_effect",
+    "condition": { "compare_string": [ "dermatik", { "context_val": "effect" } ] },
+    "effect": [ { "copy_var": { "context_val": "bodypart" }, "target_var": { "global_val": "IMPREGNATED_BODYPART" } } ]
+  },
+  {
+    "type": "effect_on_condition",
+    "id": "EOC_DERMATIK_BIRTH_INIT",
+    "recurrence": [ "3 minutes", "10 minutes" ],
+    "condition": { "and": [ { "math": [ "u_vitamin('dermatik_larva_size') >= 1440" ] }, { "x_in_y_chance": { "x": 1, "y": 3 } } ] },
+    "effect": { "u_lose_effect": "dermatik" }
+  },
+  {
+    "type": "effect_on_condition",
+    "id": "EOC_DERMATIK_BIRTH",
+    "eoc_type": "EVENT",
+    "required_event": "character_loses_effect",
+    "condition": { "compare_string": [ "dermatik", { "context_val": "effect" } ] },
+    "effect": [
+      {
+        "if": { "math": [ "u_vitamin('dermatik_larva_size') >= 1440" ] },
+        "then": [
+          { "if": { "u_has_effect": "sleep" }, "then": { "u_lose_effect": "sleep" } },
+          { "math": [ "NUM_LARVA = u_val('size')" ] },
+          {
+            "u_message": "<global_val:NUM_LARVA> dermatik larvae bursts out of the bulge of flesh on your <global_val:IMPREGNATED_BODYPART>!",
+            "type": "bad"
+          },
+          {
+            "u_spawn_monster": "mon_dermatik_larva",
+            "real_count": { "global_val": "NUM_LARVA" },
+            "min_radius": 1,
+            "max_radius": 4
+          },
+          { "u_set_field": "fd_blood", "radius": 1, "intensity": 3 },
+          "u_die"
+        ],
+        "else": { "math": [ "u_vitamin('mutant_toxin') += u_vitamin('dermatik_larva_size') / 3" ] }
+      },
+      { "u_lose_effect": "dermatik_visible" },
+      { "math": [ "u_vitamin('dermatik_larva_size') = 0" ] }
+    ]
+  },
+  {
+    "type": "effect_on_condition",
+    "id": "EOC_DERMATIK_FORMICATION",
+    "condition": {
+      "and": [
+        { "u_has_effect": "dermatik" },
+        { "not": { "u_has_effect": "formication" } },
+        { "not": { "u_has_effect": "took_antihistamine" } },
+        { "x_in_y_chance": { "x": 1, "y": { "math": [ "max(360, 2000 - u_vitamin('dermatik_larva_size'))" ] } } }
+      ]
+    },
+    "effect": [
+      { "u_message": "The growth in your <global_val:IMPREGNATED_BODYPART> itches!", "type": "bad" },
+      {
+        "u_add_effect": "formication",
+        "duration": 360,
+        "target_part": { "global_val": "IMPREGNATED_BODYPART" },
+        "intensity": { "math": [ "u_effect_intensity('dermatik_visible', 'bodypart': IMPREGNATED_BODYPART)" ] }
+      }
+    ]
+  },
+  {
+    "type": "effect_on_condition",
+    "id": "EOC_SPORE_TO_FUNGUS_EFFECT",
+    "recurrence": [ "10 minutes", "20 minutes" ],
+    "condition": { "and": [ { "u_has_effect": "spores" }, { "not": { "u_has_effect": "fungus" } } ] },
+    "effect": [
+      {
+        "if": { "one_in_chance": 4 },
+        "then": [
+          { "u_add_effect": "fungus", "intensity": 1, "duration": "PERMANENT" },
+          { "u_message": "The spores sink into your flesh.", "type": "bad" }
+        ],
+        "else": { "u_message": "You should get these spores off, quickly.", "type": "warning" }
+      }
+    ]
+  },
+  {
+    "type": "effect_on_condition",
+    "id": "EOC_FUNGUS_WORSEN",
+    "recurrence": [ "8 hours", "12 hours" ],
+    "condition": { "and": [ { "u_has_effect": "fungus" }, { "not": { "u_has_effect": "antifungal" } } ] },
+    "effect": [
+      { "u_add_effect": "fungus", "intensity": { "math": [ "u_effect_intensity('fungus') + 1" ] }, "duration": "PERMANENT" }
+    ]
+  },
+  {
+    "type": "effect_on_condition",
+    "id": "EOC_FUNGUS_EFFECT_HAPPY",
+    "recurrence": [
+      { "math": [ "3600 + u_effect_intensity('fungus') * 3600" ] },
+      { "math": [ "7200 + u_effect_intensity('fungus') * 3600" ] }
+    ],
+    "//": "You feel happier more frequently at lower levels of infection, less frequently at higher levels.",
+    "condition": { "math": [ "u_effect_intensity('fungus') >= 2" ] },
+    "effect": [
+      { "u_lose_morale": "morale_fungus_bad" },
+      {
+        "u_add_morale": "morale_fungus_good",
+        "bonus": 10,
+        "max_bonus": 20,
+        "duration": "2 days",
+        "decay_start": "2 days"
+      },
+      { "u_message": "You feel alive again!" }
+    ],
+    "false_effect": [ { "u_lose_morale": "morale_fungus_good" } ]
+  },
+  {
+    "type": "effect_on_condition",
+    "id": "EOC_FUNGUS_EFFECT_SAD",
+    "//": "You feel sadder less frequently at lower levels of infection, more frequently at higher levels.",
+    "recurrence": [
+      { "math": [ "7200 - u_effect_intensity('fungus') * 900" ] },
+      { "math": [ "10800 - u_effect_intensity('fungus') * 900" ] }
+    ],
+    "condition": { "math": [ "u_effect_intensity('fungus') >= 2" ] },
+    "effect": [
+      { "u_lose_morale": "morale_fungus_good" },
+      {
+        "u_add_morale": "morale_fungus_bad",
+        "bonus": -10,
+        "max_bonus": -20,
+        "duration": "2 days",
+        "decay_start": "2 days"
+      },
+      { "u_message": "You feel like curling up into a ball and rotting away." }
+    ],
+    "false_effect": [ { "u_lose_morale": "morale_fungus_bad" } ]
+  },
+  {
+    "type": "effect_on_condition",
+    "id": "EOC_FUNGUS_MINOR_EFFECTS",
+    "recurrence": [
+      { "math": [ "3600 - u_effect_intensity('fungus') * 200" ] },
+      { "math": [ "4800 - u_effect_intensity('fungus') * 200" ] }
+    ],
+    "condition": { "math": [ "u_effect_intensity('fungus') >= 2" ] },
+    "effect": [
+      {
+        "if": { "one_in_chance": 2 },
+        "then": { "u_message": "You feel nauseous.", "type": "warning" },
+        "else": { "u_message": "You smell and taste mushrooms.", "type": "warning" }
+      }
+    ]
+  },
+  {
+    "type": "effect_on_condition",
+    "id": "EOC_FUNGUS_MEDIUM_EFFECTS",
+    "recurrence": [
+      { "math": [ "7200 - u_effect_intensity('fungus') * 200" ] },
+      { "math": [ "8400 - u_effect_intensity('fungus') * 200" ] }
+    ],
+    "condition": { "math": [ "u_effect_intensity('fungus') >= 3" ] },
+    "effect": [
+      {
+        "if": { "x_in_y_chance": { "x": 7, "y": 10 } },
+        "then": [
+          { "u_message": "You spasm suddenly!", "type": "bad" },
+          { "u_add_effect": "stunned", "duration": 1 },
+          { "u_deal_damage": "biological", "amount": { "math": [ "5 - rand(5)" ] }, "bodypart": "torso" }
+        ],
+        "else": [ { "u_message": "You vomit a thick, gray goop.", "type": "bad" }, "u_vomit" ]
+      }
+    ]
+  },
+  {
+    "type": "effect_on_condition",
+    "id": "EOC_FUNGUS_STRONG_EFFECTS",
+    "recurrence": [
+      { "math": [ "7200 - u_effect_intensity('fungus') * 200" ] },
+      { "math": [ "8400 - u_effect_intensity('fungus') * 200" ] }
+    ],
+    "condition": { "math": [ "u_effect_intensity('fungus') >= 4" ] },
+    "effect": [
+      { "u_message": "You vomit thousands of live spores!", "type": "bad" },
+      { "run_eocs": "EOC_MARLOSS_SPORE_TILE", "time_in_future": 0 }
+    ]
+  },
+  {
+    "type": "effect_on_condition",
+    "id": "EOC_FUNGUS_MAX_EFFECTS",
+    "//": "Basically death.",
+    "recurrence": [
+      { "math": [ "7200 - u_effect_intensity('fungus') * 200" ] },
+      { "math": [ "8400 - u_effect_intensity('fungus') * 200" ] }
+    ],
+    "condition": { "math": [ "u_effect_intensity('fungus') >= 5" ] },
+    "effect": [
+      {
+        "if": {
+          "and": [ { "x_in_y_chance": { "x": 9, "y": 10 } }, { "math": [ "u_hp('arm_l') > 1" ] }, { "math": [ "u_hp('arm_r') > 1" ] } ]
+        },
+        "then": [
+          { "u_message": "Your arms feel like they're going to burst!", "type": "bad" },
+          { "math": [ "u_pain('type': 'perceived') = 90" ] },
+          { "u_add_effect": "stunned", "duration": 1 },
+          { "u_deal_damage": "biological", "amount": { "math": [ "5 - rand(5)" ] }, "bodypart": "arm_l" },
+          { "u_deal_damage": "biological", "amount": { "math": [ "5 - rand(5)" ] }, "bodypart": "arm_r" }
+        ],
+        "else": [
+          {
+            "if": { "and": [ { "math": [ "u_hp('arm_l') > 1" ] }, { "math": [ "u_hp('arm_r') > 1" ] } ] },
+            "then": [
+              { "u_message": "Your hands bulge.  Fungus stalks burst through the bulge!", "type": "bad" },
+              { "math": [ "u_pain('type': 'perceived') = 90" ] },
+              { "u_add_effect": "stunned", "duration": 10 },
+              { "u_deal_damage": "biological", "amount": { "math": [ "999" ] }, "bodypart": "arm_l" },
+              { "u_deal_damage": "biological", "amount": { "math": [ "999" ] }, "bodypart": "arm_r" }
+            ],
+            "else": [
+              { "u_message": "The flesh on your broken arms bulges.  Fungus stalks burst through!", "type": "bad" },
+              { "math": [ "u_pain('type': 'perceived') = 90" ] },
+              { "u_add_effect": "stunned", "duration": 10 },
+              { "u_deal_damage": "biological", "amount": { "math": [ "999" ] }, "bodypart": "arm_l" },
+              { "u_deal_damage": "biological", "amount": { "math": [ "999" ] }, "bodypart": "arm_r" }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+]

@@ -5,82 +5,165 @@
 #include <map>
 #include <set>
 #include <string>
+#include <string_view>
+#include <tuple>
+#include <utility>
+#include <vector>
 
 #include "calendar.h"
-#include "optional.h"
-#include "string_id.h"
-#include "translations.h"
+#include "math_parser_diag_value.h"
+#include "requirements.h"
+#include "translation.h"
 #include "type_id.h"
+#include "value_ptr.h"
+#include "weighted_list.h"
 
 class JsonObject;
+class item;
+template <typename T> class generic_factory;
+template <typename E> struct enum_traits;
 
-struct mending_method {
-    std::string id;
-    translation name;
-    translation description;
-    translation success_msg;
-    time_duration time;
-    std::map<skill_id, int> skills;
-    requirement_id requirements;
-    cata::optional<fault_id> turns_into;
-    cata::optional<fault_id> also_mends;
+namespace faults
+{
+void load_fault( const JsonObject &jo, const std::string &src );
+void load_fix( const JsonObject &jo, const std::string &src );
+void load_group( const JsonObject &jo, const std::string &src );
+
+void reset();
+void finalize();
+void check_consistency();
+
+std::vector<fault_id> all_of_type( const std::string &type );
+
+const fault_id &random_of_type( const std::string &type );
+const fault_id &random_of_type_item_has( const item &it, const std::string &type );
+} // namespace faults
+
+enum class fault_severity : int {
+    none,
+    minor,
+    major,
+    critical,
+    last
+};
+
+template<>
+struct enum_traits<fault_severity> {
+    static constexpr fault_severity last = fault_severity::last;
+};
+
+class fault_fix
+{
+    public:
+        fault_fix_id id = fault_fix_id::NULL_ID();
+        translation name;
+        translation success_msg; // message to print on applying successfully
+        time_duration time = 0_seconds;
+        std::map<std::string, diag_value> set_variables; // item vars applied to item
+        // item vars adjustment(s) applied to item via multiplication;
+        std::map<std::string, double> adjust_variables_multiply;
+        std::map<skill_id, int> skills; // map of skill_id to required level
+        std::set<fault_id> faults_removed; // which faults are removed on applying
+        std::set<fault_id> faults_added; // which faults are added on applying
+        int mod_damage = 0; // mod_damage with this value is called on item applied to
+        int mod_degradation = 0; // mod_degradation with this value is called on item applied to
+        std::map<proficiency_id, float>
+        time_save_profs; // map of proficiency_id and the time saving for posessing it
+        std::map<flag_id, float>
+        time_save_flags; // map of flag_id and the time saving for the mendee item posessing it
+
+        const requirement_data &get_requirements() const;
+
+        void finalize();
+    private:
+        void load( const JsonObject &jo, std::string_view src );
+        void check() const;
+        bool was_loaded = false; // used by generic_factory
+        friend class generic_factory<fault_fix>;
+        friend class fault;
+
+        // used to store requirements, since requirement ids are unavailable at the moment of loading
+        // transferred into requirements at finalization
+        std::vector<std::pair<requirement_id, int>> pending_requirements;
+
+        cata::value_ptr<requirement_data> requirements = cata::make_value<requirement_data>();
 };
 
 class fault
 {
     public:
-        fault() : id_( fault_id( "null" ) ) {}
+        fault_id id = fault_id::NULL_ID();
+        std::string name() const;
+        std::string type() const; // use a set of types?
+        std::string description() const;
+        std::string item_prefix() const;
+        std::string item_suffix() const;
+        std::string message() const;
+        std::string color() const;
+        fault_severity severity() const;
+        double price_mod() const;
+        // having this faults adds this much of temporary (will be removed when fault is fixed) degradation
+        int degradation_mod() const;
+        // Damage applied when fault is applied.
+        int instant_damage() const;
+        // int is additive (default 0), float is multiplier (default 1)
+        std::vector<std::tuple<int, float, damage_type_id>> melee_damage_mod() const;
+        // int is additive (default 0), float is multiplier (default 1)
+        std::vector<std::tuple<int, float, damage_type_id>> armor_mod() const;
+        bool affected_by_degradation() const;
+        double encumb_mod_flat() const;
+        double encumb_mod_mult() const;
+        float contact_area_mod() const;
+        float rolling_resistance_mod() const;
+        int vehicle_move_penalty_mod() const;
+        bool has_flag( const std::string &flag ) const;
+        const std::set<fault_id> &get_block_faults() const;
 
-        const fault_id &id() const {
-            return id_;
-        }
-
-        bool is_null() const {
-            return id_ == fault_id( "null" );
-        }
-
-        std::string name() const {
-            return name_.translated();
-        }
-
-        std::string description() const {
-            return description_.translated();
-        }
-
-        const std::map<std::string, mending_method> &mending_methods() const {
-            return mending_methods_;
-        }
-
-        const mending_method *find_mending_method( const std::string &id ) const {
-            if( mending_methods_.find( id ) != mending_methods_.end() ) {
-                return &mending_methods_.at( id );
-            } else {
-                return nullptr;
-            }
-        }
-
-        bool has_flag( const std::string &flag ) const {
-            return flags.count( flag );
-        }
-
-        /** Load fault from JSON definition */
-        static void load_fault( const JsonObject &jo );
-
-        /** Get all currently loaded faults */
-        static const std::map<fault_id, fault> &all();
-
-        /** Clear all loaded faults (invalidating any pointers) */
-        static void reset();
-
-        /** Checks all loaded from JSON are valid */
-        static void check_consistency();
-
+        const std::set<fault_fix_id> &get_fixes() const;
     private:
-        fault_id id_;
+        void load( const JsonObject &jo, std::string_view );
+        void check() const;
+        bool was_loaded = false; // used by generic_factory
+        friend class generic_factory<fault>;
+        friend class fault_fix;
+
+        std::string type_;
         translation name_;
         translation description_;
-        std::map<std::string, mending_method> mending_methods_;
+        translation item_prefix_; // prefix added to affected item's name
+        translation item_suffix_;
+        translation message_;
+        std::string color_;
+        fault_severity severity_ = fault_severity::none;
+        std::set<fault_fix_id> fixes;
         std::set<std::string> flags;
+        std::set<fault_id> block_faults;
+        double price_modifier = 1.0;
+        int degradation_mod_ = 0;
+        int instant_damage_ = 0;
+        float contact_area_mod_ = 1.f;
+        float rolling_resistance_mod_ = 1.f;
+        int vehicle_move_penalty_mod_ = 1.f;
+        std::vector<std::tuple<int, float, damage_type_id>> melee_damage_mod_;
+        std::vector<std::tuple<int, float, damage_type_id>> armor_mod_;
+        int encumbrance_mod_flat_ = 0;
+        float encumbrance_mod_mult_ = 1.f;
+        // todo add tool_quality_mod_; axe with no handle won't axe
+        bool affected_by_degradation_ = false;
+
+};
+
+class fault_group
+{
+    public:
+        fault_group_id id;
+        weighted_int_list<fault_id> get_weighted_list() const;
+
+    private:
+        void load( const JsonObject &jo, std::string_view );
+        bool was_loaded = false;
+        friend class generic_factory<fault_group>;
+        weighted_int_list<fault_id> fault_weighted_list;
 };
 
 #endif // CATA_SRC_FAULT_H

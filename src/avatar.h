@@ -2,55 +2,61 @@
 #ifndef CATA_SRC_AVATAR_H
 #define CATA_SRC_AVATAR_H
 
-#include <cstddef>
+#include <array>
+#include <cstdint>
 #include <list>
 #include <map>
 #include <memory>
+#include <optional>
+#include <set>
 #include <string>
+#include <string_view>
 #include <unordered_set>
+#include <utility>
 #include <vector>
 
+#include "bodypart.h"
 #include "calendar.h"
 #include "character.h"
+#include "character_id.h"
 #include "coordinates.h"
 #include "enums.h"
 #include "game_constants.h"
+#include "inventory.h"
+#include "item.h"
+#include "item_location.h"
 #include "magic_teleporter_list.h"
-#include "map_memory.h"
+#include "mdarray.h"
 #include "memory_fast.h"
-#include "player.h"
 #include "point.h"
-#include "string_id.h"
 #include "type_id.h"
+#include "units.h"
 
-class JsonIn;
 class JsonObject;
 class JsonOut;
 class advanced_inv_area;
 class advanced_inv_listitem;
 class advanced_inventory_pane;
-class faction;
-class item;
-class item_location;
+class cata_path;
+class diary;
+class map_memory;
+class memorized_tile;
 class mission;
 class monster;
-class nc_color;
 class npc;
 class talker;
-namespace catacurses
-{
-class window;
-} // namespace catacurses
-enum class character_type : int;
+struct bionic;
+struct mtype;
 
 namespace debug_menu
 {
 class mission_debug;
 }  // namespace debug_menu
-struct mtype;
-struct points_left;
+enum class pool_type;
 
 // Monster visible in different directions (safe mode & compass)
+// Suppressions due to a bug in clang-tidy 12
+// NOLINTNEXTLINE(bugprone-reserved-identifier,cert-dcl37-c,cert-dcl51-cpp)
 struct monster_visible_info {
     // New monsters visible from last update
     std::vector<shared_ptr_fast<monster>> new_seen_mon;
@@ -59,31 +65,66 @@ struct monster_visible_info {
     // 7 0 1    unique_types uses these indices;
     // 6 8 2    0-7 are provide by direction_from()
     // 5 4 3    8 is used for local monsters (for when we explain them below)
-    std::vector<npc *> unique_types[9];
-    std::vector<const mtype *> unique_mons[9];
+    std::array<std::vector<npc *>, 9> unique_types;
+    std::array<std::vector<std::pair<const mtype *, int>>, 9> unique_mons;
 
-    // If the moster visible in this direction is dangerous
-    bool dangerous[8] = {};
+    // If the monster visible in this direction is dangerous
+    std::array<bool, 8> dangerous = {};
+
+    // Whether or not there is at last one creature within safemode proximity that
+    // is dangerous
+    bool has_dangerous_creature_in_proximity = false;
+
+    void remove_npc( npc *n );
 };
 
-class avatar : public player
+struct point_of_interest {
+    tripoint_abs_omt pos = tripoint_abs_omt::invalid;
+    std::string text;
+};
+
+class avatar : public Character
 {
     public:
         avatar();
+        avatar( const avatar & ) = delete;
+        // NOLINTNEXTLINE(performance-noexcept-move-constructor)
+        avatar( avatar && );
+        ~avatar() override;
+        avatar &operator=( const avatar & ) = delete;
+        // NOLINTNEXTLINE(performance-noexcept-move-constructor)
+        avatar &operator=( avatar && );
+
+        // Zone sort viewport lock state -- ephemeral, not serialized.
+        // Visual lock only; zoom restoration is on the activity actor.
+        struct zone_sort_viewport_t {
+            bool active = false;
+            tripoint_abs_ms center;
+            int target_zoom = 0;
+            int saved_zoom = 0;
+            tripoint_abs_ms bbox_min;
+            tripoint_abs_ms bbox_max;
+        };
+        zone_sort_viewport_t zone_sort_viewport; // NOLINT(cata-serialize)
 
         void store( JsonOut &json ) const;
         void load( const JsonObject &data );
+        void export_as_npc( const cata_path &path );
         void serialize( JsonOut &json ) const override;
-        void deserialize( JsonIn &jsin ) override;
-        void serialize_map_memory( JsonOut &jsout ) const;
-        void deserialize_map_memory( JsonIn &jsin );
+        void deserialize( const JsonObject &data ) override;
+        bool save_map_memory();
+        void load_map_memory();
+        void clear_map_memory();
+
+        void ensure_portrait_valid() override;
 
         // newcharacter.cpp
         bool create( character_type type, const std::string &tempname = "" );
-        void add_profession_items();
-        void randomize( bool random_scenario, points_left &points, bool play_now = false );
-        bool load_template( const std::string &template_name, points_left &points );
-        void save_template( const std::string &name, const points_left &points );
+        // initialize avatar and avatar mocks
+        void initialize( character_type type );
+        bool load_template( const std::string &template_name, pool_type & );
+        void save_template( const std::string &name, pool_type );
+        void character_to_template( const std::string &name );
 
         bool is_avatar() const override {
             return true;
@@ -95,53 +136,75 @@ class avatar : public player
             return this;
         }
 
-        void toggle_map_memory();
-        bool should_show_map_memory();
-        /** Memorizes a given tile in tiles mode; finalize_tile_memory needs to be called after it */
-        void memorize_tile( const tripoint &pos, const std::string &ter, int subtile,
-                            int rotation );
-        /** Returns last stored map tile in given location in tiles mode */
-        memorized_terrain_tile get_memorized_tile( const tripoint &p ) const;
-        /** Memorizes a given tile in curses mode; finalize_terrain_memory_curses needs to be called after it */
-        void memorize_symbol( const tripoint &pos, int symbol );
-        /** Returns last stored map tile in given location in curses mode */
-        int get_memorized_symbol( const tripoint &p ) const;
-        /** Returns the amount of tiles survivor can remember. */
-        size_t max_memorized_tiles() const;
-        void clear_memorized_tile( const tripoint &pos );
+        mfaction_id get_monster_faction() const override;
+
+        void witness_thievery( item * ) override {}
+
+        std::string get_save_id() const {
+            return save_id.empty() ? name : save_id;
+        }
+        void set_save_id( const std::string &id ) {
+            save_id = id;
+        }
+        /**
+         * Makes the avatar "take over" the given NPC, while the current avatar character
+         * becomes an NPC.
+         */
+        void control_npc( npc &, bool debug = false );
+        /**
+         * Open a menu to choose the NPC to take over.
+         */
+        void control_npc_menu( bool debug = false );
+        using Character::query_yn;
+        bool query_yn( const std::string &mes ) const override;
+
+        //! @copydoc map_memory::is_valid() const
+        bool is_map_memory_valid() const;
+        bool should_show_map_memory() const;
+        void prepare_map_memory_region( const tripoint_abs_ms &p1, const tripoint_abs_ms &p2 );
+        const memorized_tile &get_memorized_tile( const tripoint_abs_ms &p ) const;
+        bool has_memory_at( const tripoint_abs_ms &p ) const;
+        void memorize_terrain( const tripoint_abs_ms &p, std::string_view id,
+                               int subtile, int rotation );
+        void memorize_decoration( const tripoint_abs_ms &p, std::string_view id,
+                                  int subtile, int rotation );
+        void memorize_symbol( const tripoint_abs_ms &p, char32_t symbol );
+        void memorize_clear_decoration( const tripoint_abs_ms &p, std::string_view prefix = "" );
 
         nc_color basic_symbol_color() const override;
         int print_info( const catacurses::window &w, int vStart, int vLines, int column ) const override;
+        std::string display_name( bool capitalize_first = false ) const;
 
-        /** Provides the window and detailed morale data */
-        void disp_morale();
-        /** Uses morale and other factors to return the player's focus target goto value */
-        int calc_focus_equilibrium( bool ignore_pain = false ) const;
-        /** Calculates actual focus gain/loss value from focus equilibrium*/
-        int calc_focus_change() const;
-        /** Uses calc_focus_change to update the player's current focus */
-        void update_mental_focus();
         /** Resets stats, and applies effects in an idempotent manner */
         void reset_stats() override;
         /** Resets all missions before saving character to template */
-        void reset_all_misions();
+        void reset_all_missions();
 
         std::vector<mission *> get_active_missions() const;
         std::vector<mission *> get_completed_missions() const;
         std::vector<mission *> get_failed_missions() const;
+        std::vector<point_of_interest> get_points_of_interest() const;
         /**
-         * Returns the mission that is currently active. Returns null if mission is active.
+         * Returns the mission that is currently active. Returns null if no mission is active.
          */
         mission *get_active_mission() const;
         /**
-         * Returns the target of the active mission or @ref overmap::invalid_tripoint if there is
-         * no active mission.
+         * Returns the point of interest that is currently active. Returns null if no mission is active.
+         */
+        point_of_interest get_active_point_of_interest() const;
+        /**
+         * Returns the target of the active mission/point of interest or @ref tripoint_abs_omt::invalid if there is
+         * no active mission or point of interest.
          */
         tripoint_abs_omt get_active_mission_target() const;
         /**
          * Set which mission is active. The mission must be listed in @ref active_missions.
          */
         void set_active_mission( mission &cur_mission );
+        /**
+         * Set which point of interest is active. The point of interest must be listed in @ref points_of_interest.
+         */
+        void set_active_point_of_interest( const point_of_interest &active_point_of_interest );
         /**
          * Called when a mission has been assigned to the player.
          */
@@ -151,150 +214,267 @@ class avatar : public player
          * Check @ref mission::has_failed to see which case it is.
          */
         void on_mission_finished( mission &cur_mission );
+        /**
+         * Returns true if character has the mission in their active missions list.
+         */
+        bool has_mission_id( const mission_type_id &miss_id );
+
+        void remove_active_mission( mission &cur_mission );
+
+        /**
+        * Despite the name, this operation also makes an existing point of interest active.
+        */
+        void add_point_of_interest( const point_of_interest &new_point_of_interest );
+        void delete_point_of_interest( tripoint_abs_omt pos );
+
+        //return avatar diary
+        diary *get_avatar_diary();
 
         // Dialogue and bartering--see npctalk.cpp
-        void talk_to( std::unique_ptr<talker> talk_with, bool text_only = false,
-                      bool radio_contact = false );
+        void talk_to( std::unique_ptr<talker> talk_with, bool radio_contact = false,
+                      bool is_computer = false, bool is_not_conversation = false,
+                      const std::string &debug_topic = "",
+                      const std::string &remote_name = "" );
 
         /**
-         * Helper function for player::read.
-         *
-         * @param book Book to read
-         * @param reasons Starting with g->u, for each player/NPC who cannot read, a message will be pushed back here.
-         * @returns nullptr, if neither the player nor his followers can read to the player, otherwise the player/NPC
-         * who can read and can read the fastest
+         * Try to disarm the NPC. May result in fail attempt, you receiving the weapon and instantly wielding it,
+         * or the weapon falling down on the floor nearby. NPC is always getting angry with you.
+         * @param target Target NPC to disarm
          */
-        const player *get_book_reader( const item &book, std::vector<std::string> &reasons ) const;
+        void disarm( npc &target );
         /**
-         * Helper function for get_book_reader
-         * @warning This function assumes that the everyone is able to read
-         *
-         * @param book The book being read
-         * @param reader the player/NPC who's reading to the caller
-         * @param learner if not nullptr, assume that the caller and reader read at a pace that isn't too fast for him
+         * Try to wield a contained item consuming moves proportional to weapon skill and volume.
+         * @param container Container containing the item to be wielded
+         * @param internal_item reference to contained item to wield.
+         * @param penalties Whether item volume and temporary effects (e.g. GRABBED, DOWNED) should be considered.
+         * @param base_cost Cost due to storage type.
          */
-        int time_to_read( const item &book, const player &reader, const player *learner = nullptr ) const;
+        bool wield_contents( item &container, item *internal_item = nullptr, bool penalties = true,
+                             int base_cost = INVENTORY_HANDLING_PENALTY );
+        /** Handles sleep attempts by the player, starts ACT_TRY_SLEEP activity */
+        void try_to_sleep( const time_duration &dur );
+        void set_pos_abs_only( const tripoint_abs_ms &loc );
         /** Handles reading effects and returns true if activity started */
-        bool read( item &it, bool continuous = false );
-        /** Completes book reading action. **/
-        void do_read( item &book );
+        bool read( item_location &book, item_location ereader = {} );
         /** Note that we've read a book at least once. **/
         bool has_identified( const itype_id &item_id ) const override;
+        void identify( const item &item ) override;
+        void clear_identified();
+        // clears nutrition related values e.g. calorie_diary, consumption_history...
+        void clear_nutrition();
 
-        void wake_up();
+        void add_snippet( snippet_id snippet );
+        bool has_seen_snippet( const snippet_id &snippet ) const;
+        const std::set<snippet_id> &get_snippets();
+
+        /** smash a map feature */
+        struct smash_result {
+            bool can_smash;
+            bool did_smash;
+            bool success;
+        };
+        smash_result smash( tripoint_bub_ms &smashp );
+
+        /**
+         * Opens the targeting menu to pull a nearby creature towards the character.
+         * @param name Name of the implement used to pull the creature. */
+        void longpull( const std::string &name );
+
+        void wake_up() override;
         // Grab furniture / vehicle
-        void grab( object_type grab_type, const tripoint &grab_point = tripoint_zero );
+        void grab( object_type grab_type, const tripoint_rel_ms &grab_point = tripoint_rel_ms::zero );
         object_type get_grab_type() const;
         /** Handles player vomiting effects */
         void vomit();
-
+        // if avatar is affected by relax_gas this rolls chance to overcome it at cost of moves
+        // prints messages for success/failure
+        // @return true if no relax_gas effect or rng roll to ignore it was successful
+        bool try_break_relax_gas( const std::string &msg_success, const std::string &msg_failure );
+        void add_pain_msg( int val, const bodypart_id &bp ) const;
         /**
          * Try to steal an item from the NPC's inventory. May result in fail attempt, when NPC not notices you,
          * notices your steal attempt and getting angry with you, and you successfully stealing the item.
          * @param target Target NPC to steal from
          */
         void steal( npc &target );
+        /** Reassign letter. */
+        void reassign_item( item &it, int invlet );
+        void reassign_item_cache( item &it, char invlet, bool remove_old );
 
         teleporter_list translocators;
-
-        int get_str_base() const override;
-        int get_dex_base() const override;
-        int get_int_base() const override;
-        int get_per_base() const override;
 
         void upgrade_stat_prompt( const character_stat &stat_name );
         // how many points are available to upgrade via STK
         int free_upgrade_points() const;
-        // how much "kill xp" you have
-        int kill_xp() const;
+        void power_bionics() override;
+        void power_mutations() override;
+        /** Returns the bionic with the given invlet, or NULL if no bionic has that invlet */
+        bionic *bionic_by_invlet( int ch );
 
         faction *get_faction() const override;
+        bool is_ally( const Character &p ) const override;
+        bool is_obeying( const Character &p ) const override;
+
         // Set in npc::talk_to_you for use in further NPC interactions
         bool dialogue_by_radio = false;
+        // When set, overrides the NPC display name in dialogue and trade
+        // windows (e.g. "the intercom" for remote intercom conversations).
+        std::string dialogue_remote_name;
+        // Preferred aim mode - ranged.cpp aim mode defaults to this if possible
+        std::string preferred_aiming_mode;
 
+        // checks if the point is blocked based on characters current aiming state
+        bool cant_see( const tripoint_bub_ms &p ) const;
+
+        // rebuilds the full aim cache for the character if it is dirty
+        void rebuild_aim_cache() const;
+
+        // directly sets movement mode bypassing movecost of changing modes
         void set_movement_mode( const move_mode_id &mode ) override;
-
-        // Cycles to the next move mode.
-        void cycle_move_mode();
-        // Resets to walking.
         void reset_move_mode();
-        // Toggles running on/off.
-        void toggle_run_mode();
-        // Toggles crouching on/off.
-        void toggle_crouch_mode();
+        void activate_crouch_mode();
 
-        bool wield( item_location target );
-        bool wield( item &target ) override;
-        bool wield( item &target, int obtain_cost );
+        // manages deferred move cost of changing move mods
+        // primarily used for player actions that change move mode
+        void set_desired_movement_mode( const move_mode_id &mode );
+        move_mode_id get_desired_move_mode() const;
+
+        void cycle_desired_move_mode();
+        void cycle_desired_move_mode_reverse();
+
+        bool is_walk_mode_desired() const;
+        void set_walk_mode_desired();
+
+        bool is_run_mode_desired() const;
+        void toggle_run_mode_desired();
+
+        bool is_crouch_mode_desired() const;
+        void toggle_crouch_mode_desired();
+
+        bool is_prone_mode_desired() const;
+        void toggle_prone_mode_desired();
+
+
+        bool wield( item &it );
+        bool wield( item_location loc, bool remove_old = true );
+
+
+        item::reload_option select_ammo( const item_location &base, bool prompt = false,
+                                         bool empty = true ) override;
 
         /** gets the inventory from the avatar that is interactible via advanced inventory management */
         std::vector<advanced_inv_listitem> get_AIM_inventory( const advanced_inventory_pane &pane,
                 advanced_inv_area &square );
 
         using Character::invoke_item;
-        bool invoke_item( item *, const tripoint &pt ) override;
+        bool invoke_item( item *, const tripoint_bub_ms &pt, int pre_obtain_moves ) override;
         bool invoke_item( item * ) override;
-        bool invoke_item( item *, const std::string &, const tripoint &pt ) override;
+        bool invoke_item( item *, const std::string &, const tripoint_bub_ms &pt,
+                          int pre_obtain_moves = -1 ) override;
         bool invoke_item( item *, const std::string & ) override;
 
+        // invlets
+
+        void update_cache_with_item( item &newit );
+        // this used to just be a block of code in inventory::add_item
+        void add_invlet_to_new_item( item &newit );
+        void update_invlet( item &newit, const item *ignore_invlet_collision_with = nullptr );
+        void assign_empty_invlet( item &it, bool force = false );
+        char free_assigned_invlet( const itype_id &id );
+        invlets_bitset allocated_invlets() const;
+        bool invlet_is_assigned( char invlet ) const;
+        itype_id get_itype_by_invlet( char invlet ) const;
+
         monster_visible_info &get_mon_visible() {
+            return mon_visible;
+        }
+
+        const monster_visible_info &get_mon_visible() const {
             return mon_visible;
         }
 
         struct daily_calories {
             int spent = 0;
             int gained = 0;
-            int total() const {
+            int ingested = 0;
+            int total() const noexcept {
                 return gained - spent;
             }
-            std::map<float, int> activity_levels;
+            std::map<float, int> activity_levels; // NOLINT(cata-serialize)
 
-            void serialize( JsonOut &json ) const {
-                json.start_object();
+            daily_calories();
 
-                json.member( "spent", spent );
-                json.member( "gained", gained );
-                save_activity( json );
-
-                json.end_object();
-            }
-            void deserialize( JsonIn &jsin ) {
-                JsonObject data = jsin.get_object();
-
-                data.read( "spent", spent );
-                data.read( "gained", gained );
-                if( data.has_member( "activity" ) ) {
-                    read_activity( data );
-                }
-            }
-
-            daily_calories() {
-                activity_levels.emplace( NO_EXERCISE, 0 );
-                activity_levels.emplace( LIGHT_EXERCISE, 0 );
-                activity_levels.emplace( MODERATE_EXERCISE, 0 );
-                activity_levels.emplace( BRISK_EXERCISE, 0 );
-                activity_levels.emplace( ACTIVE_EXERCISE, 0 );
-                activity_levels.emplace( EXTRA_EXERCISE, 0 );
-            }
+            void serialize( JsonOut &json ) const;
+            void deserialize( const JsonObject &data );
 
             void save_activity( JsonOut &json ) const;
-            void read_activity( JsonObject &data );
-
+            void read_activity( const JsonObject &data );
         };
+
         // called once a day; adds a new daily_calories to the
         // front of the list and pops off the back if there are more than 30
         void advance_daily_calories();
+        int get_daily_spent_kcal( bool yesterday ) const;
+        int get_daily_ingested_kcal( bool yesterday ) const;
+        void add_ingested_kcal( int kcal );
+        void update_cardio_acc() override;
         void add_spent_calories( int cal ) override;
         void add_gained_calories( int cal ) override;
+        int get_daily_calories( unsigned days_ago, std::string const &type ) const;
         void log_activity_level( float level ) override;
         std::string total_daily_calories_string() const;
+        //set 0-3 random hobbies, with 1 and 2 being twice as likely as 0 and 3
+        std::set<character_id> get_followers() const;
+        std::set<character_id> get_known_faction_representatives() const;
+
+        int movecounter = 0;
+
+        // bionic power in the last turn
+        units::energy power_prev_turn = 0_kJ;
+        // balance/net power generation/loss during the last turn
+        units::energy power_balance = 0_kJ;
+
+        // amount of turns since last check for pocket noise
+        time_point last_pocket_noise = time_point( 0 );
+
+        vproto_id starting_vehicle = vproto_id::NULL_ID();
+        std::vector<mtype_id> starting_pets;
+        std::set<character_id> follower_ids;
+        std::set<character_id> faction_representatives;
+
+        mutable bool aim_cache_dirty = true;
+        // dirty the aim cache and record that the aim cone may have changed
+        void mark_aim_cache_dirty();
+        // changes each time mark_aim_cache_dirty runs
+        uint64_t aim_generation() const {
+            return aim_cache_generation;
+        }
+
+        const mood_face_id &character_mood_face( bool clear_cache = false ) const;
+
+        bool is_waiting_to_change_mode_mode();
+
+        /** Time since the avatar last left the area it stood around in; followers read it to
+         *  tell resting from travelling. Zero until the avatar has been placed. */
+        time_duration time_since_relocated() const;
 
     private:
-        map_memory player_map_memory;
-        bool show_map_memory;
-        /** Used in max_memorized_tiles to cache memory capacity. **/
-        mutable time_point current_map_memory_turn = calendar::before_time_starts;
-        mutable size_t current_map_memory_capacity = 0;
+        void on_move( const tripoint_abs_ms &old_pos ) override;
+        // where the avatar has stood around since relocated_at; not serialized
+        std::optional<tripoint_abs_ms> relocation_anchor;
+        time_point relocated_at = calendar::turn_zero;
+
+        uint64_t aim_cache_generation = 0;
+        std::map<char, itype_id> assigned_invlet;
+        invlet_favorites invlet_cache;
+        char find_usable_cached_invlet( const itype_id &item_type );
+
+        npc &get_shadow_npc();
+
+        // The name used to generate save filenames for this avatar. Not serialized in json.
+        std::string save_id;
+
+        std::unique_ptr<map_memory> player_map_memory;
 
         friend class debug_menu::mission_debug;
         /**
@@ -313,9 +493,22 @@ class avatar : public player
         /**
          * The currently active mission, or null if no mission is currently in progress.
          */
-        mission *active_mission;
         /**
-         * The amont of calories spent and gained per day for the last 30 days.
+        * Points of interest added by the player.
+        */
+        std::vector<point_of_interest> points_of_interest;
+
+        mission *active_mission;
+
+        point_of_interest active_point_of_interest;
+
+        void update_active_mission();
+        /**
+        * diary to track player progression and to write the players story
+        */
+        std::unique_ptr <diary> a_diary;
+        /**
+         * The amount of calories spent and gained per day for the last 30 days.
          * the back is popped off and a new one added to the front at midnight each day
          */
         std::list<daily_calories> calorie_diary;
@@ -323,44 +516,27 @@ class avatar : public player
         // Items the player has identified.
         std::unordered_set<itype_id> items_identified;
 
+        // Snippets the player has seen
+        std::set<snippet_id> snippets_read;
+
         object_type grab_type;
 
-        // these are the stat upgrades from stats through kills
-
-        int str_upgrade = 0;
-        int dex_upgrade = 0;
-        int int_upgrade = 0;
-        int per_upgrade = 0;
-
         monster_visible_info mon_visible;
+
+        /**
+         * The NPC that would control the avatar's character in the avatar's absence.
+         * The Character data in this object is not relevant/used.
+         */
+        std::unique_ptr<npc> shadow_npc;
+
+        // true when the space is still visible when aiming
+        mutable cata::mdarray<bool, point_bub_ms> aim_cache;
+
+        move_mode_id desired_move_mode;
 };
 
 avatar &get_avatar();
 std::unique_ptr<talker> get_talker_for( avatar &me );
 std::unique_ptr<talker> get_talker_for( avatar *me );
-
-struct points_left {
-    int stat_points;
-    int trait_points;
-    int skill_points;
-
-    enum point_limit : int {
-        FREEFORM = 0,
-        ONE_POOL,
-        MULTI_POOL,
-        TRANSFER,
-    } limit;
-
-    points_left();
-    void init_from_options();
-    // Highest amount of points to spend on stats without points going invalid
-    int stat_points_left() const;
-    int trait_points_left() const;
-    int skill_points_left() const;
-    bool is_freeform();
-    bool is_valid();
-    bool has_spare();
-    std::string to_string();
-};
 
 #endif // CATA_SRC_AVATAR_H

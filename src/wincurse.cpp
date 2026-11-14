@@ -1,24 +1,29 @@
+#pragma GCC diagnostic ignored "-Wunused-macros"
 #if !defined(TILES) && defined(_WIN32)
-#define UNICODE 1
 #ifndef CMAKE
 #define _UNICODE 1
 #endif
+#define UNICODE 1
 #include "cursesport.h" // IWYU pragma: associated
-
+#ifndef TUI
 #include <cstdlib>
 #include <fstream>
 
+#include "cached_options.h"
+#if defined(SDL_SOUND)
+#include "sound_backend.h"
+#endif
 #include "cursesdef.h"
 #include "options.h"
 #include "output.h"
 #include "color.h"
 #include "catacharset.h"
-#include "get_version.h"
 #include "init.h"
 #include "input.h"
 #include "path_info.h"
 #include "filesystem.h"
 #include "debug.h"
+#include "cata_scope_helpers.h"
 #include "cata_utility.h"
 #include "string_formatter.h"
 #include "color_loader.h"
@@ -27,6 +32,11 @@
 #include "mmsystem.h"
 #include "ui_manager.h"
 #include "wcwidth.h"
+
+
+#if defined(SDL_SOUND)
+#include "sdlsound.h"
+#endif
 
 //***********************************
 //Globals                           *
@@ -85,7 +95,6 @@ static bool WinCreate()
 {
     // Get current process handle
     WindowINST = GetModuleHandle( nullptr );
-    std::string title = string_format( "Cataclysm: Dark Days Ahead - %s", getVersionString() );
 
     // Register window class
     WNDCLASSEXW WindowClassType   = WNDCLASSEXW();
@@ -118,7 +127,7 @@ static bool WinCreate()
     int WindowY = WorkArea.bottom / 2 - ( WndRect.bottom - WndRect.top ) / 2;
 
     // Magic
-    WindowHandle = CreateWindowExW( 0, szWindowClass, widen( title ).c_str(), WndStyle,
+    WindowHandle = CreateWindowExW( 0, szWindowClass, L"", WndStyle,
                                     WindowX, WindowY,
                                     WndRect.right - WndRect.left,
                                     WndRect.bottom - WndRect.top,
@@ -181,7 +190,7 @@ bool handle_resize( int, int )
         TERMINAL_HEIGHT = WndRect.bottom / fontheight;
         WindowWidth = TERMINAL_WIDTH * fontwidth;
         WindowHeight = TERMINAL_HEIGHT * fontheight;
-        catacurses::stdscr = catacurses::newwin( TERMINAL_HEIGHT, TERMINAL_WIDTH, point_zero );
+        catacurses::stdscr = catacurses::newwin( TERMINAL_HEIGHT, TERMINAL_WIDTH, point::zero );
         catacurses::resizeterm();
         create_backbuffer();
         SetBkMode( backbuffer, TRANSPARENT ); //Transparent font backgrounds
@@ -558,7 +567,7 @@ static void CheckMessages()
         DispatchMessage( &msg );
     }
     if( needs_resize ) {
-        restore_on_out_of_scope<int> prev_lastchar( lastchar );
+        restore_on_out_of_scope prev_lastchar( lastchar );
         handle_resize( 0, 0 );
         refresh_display();
     }
@@ -633,7 +642,7 @@ void catacurses::init_interface()
     }
 
     // Use desired font, if possible
-    assert( !fl.typeface.empty() );
+    cata_assert( !fl.typeface.empty() );
     font = CreateFontW( fontheight, fontwidth, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
                         DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
                         PROOF_QUALITY, FF_MODERN, widen( fl.typeface.front() ).c_str() );
@@ -649,10 +658,23 @@ void catacurses::init_interface()
     }
     init_colors();
 
-    stdscr = newwin( get_option<int>( "TERMINAL_Y" ), get_option<int>( "TERMINAL_X" ), point_zero );
+    stdscr = newwin( get_option<int>( "TERMINAL_Y" ), get_option<int>( "TERMINAL_X" ), point::zero );
     //newwin calls `new WINDOW`, and that will throw, but not return nullptr.
 
     initialized = true;
+
+#if defined(SDL_SOUND)
+    initSDLAudioOnly();
+    init_sound();
+    if( sound_init_success ) {
+        load_soundset();
+    }
+#endif
+}
+
+bool catacurses::supports_256_colors()
+{
+    return COLORS >= 256;
 }
 
 // A very accurate and responsive timer (NEVER use GetTickCount)
@@ -663,10 +685,28 @@ static uint64_t GetPerfCount()
     return Count;
 }
 
+void input_manager::pump_events()
+{
+    if( test_mode ) {
+        return;
+    }
+
+    // Handle all events, but ignore any keypress
+    CheckMessages();
+
+    lastchar = ERR;
+    previously_pressed_key = 0;
+}
+
 // we can probably add support for keycode mode, but wincurse is deprecated
 // so we just ignore the mode argument.
 input_event input_manager::get_input_event( const keyboard_mode /*preferred_keyboard_mode*/ )
 {
+    if( test_mode ) {
+        // input should be skipped in caller's code
+        throw std::runtime_error( "input_manager::get_input_event called in test mode" );
+    }
+
     // standards note: getch is sometimes required to call refresh
     // see, e.g., http://linux.die.net/man/3/getch
     // so although it's non-obvious, that refresh() call (and maybe InvalidateRect?) IS supposed to be there
@@ -715,7 +755,7 @@ input_event input_manager::get_input_event( const keyboard_mode /*preferred_keyb
         rval.text = utf32_to_utf8( lastchar );
         previously_pressed_key = lastchar;
         // for compatibility only add the first byte, not the code point
-        // as it would  conflict with the special keys defined by ncurses
+        // as it would conflict with the special keys defined by ncurses
         rval.add_input( lastchar );
     }
 
@@ -727,15 +767,17 @@ bool gamepad_available()
     return false;
 }
 
-cata::optional<tripoint> input_context::get_coordinates( const catacurses::window & )
+std::optional<tripoint_bub_ms> input_context::get_coordinates( const catacurses::window &,
+        const point &, bool center_cursor ) const
 {
     // TODO: implement this properly
-    return cata::nullopt;
+    return std::nullopt;
 }
 
 // Ends the terminal, destroy everything
 void catacurses::endwin()
 {
+    ui_manager::reset();
     DeleteObject( font );
     WinDestroy();
     // Unload it
@@ -763,10 +805,6 @@ void input_manager::set_timeout( const int t )
     inputdelay = t;
 }
 
-void cata_cursesport::handle_additional_window_clear( WINDOW * )
-{
-}
-
 int get_scaling_factor()
 {
     return 1;
@@ -779,7 +817,25 @@ HWND getWindowHandle()
 
 void refresh_display()
 {
+#if defined(SDL_SOUND)
+    sound_backend::poll();
+#endif
     RedrawWindow( WindowHandle, nullptr, nullptr, RDW_INVALIDATE | RDW_UPDATENOW );
 }
 
+void drain_renderer_recovery()
+{
+}
+
+void refresh_mouse_config()
+{
+}
+
+void set_title( const std::string &title )
+{
+    if( WindowHandle != nullptr ) {
+        SetWindowTextW( WindowHandle, widen( title ).c_str() );
+    }
+}
+#endif // TUI
 #endif
